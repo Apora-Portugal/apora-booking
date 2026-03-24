@@ -57,6 +57,8 @@
     .btn { width: 100%; background: #7ec89a; color: #0c0f0e; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; font-family: inherit; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-secondary { width: 100%; background: transparent; color: #9a968e; border: 1px solid #1c2320; border-radius: 12px; padding: 14px; font-size: 14px; cursor: pointer; margin-top: 8px; font-family: inherit; }
+    .privacy-note { font-size: 11px; color: #6b6760; line-height: 1.5; margin-top: 12px; text-align: center; }
+    .privacy-note a { color: #6b6760; text-decoration: underline; }
     .btn-chat { width: 100%; background: rgba(126,200,154,0.1); color: #7ec89a; border: 1px solid rgba(126,200,154,0.3); border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 20px; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .btn-chat:hover { background: rgba(126,200,154,0.18); }
     .success { text-align: center; padding: 40px 20px; }
@@ -381,6 +383,7 @@ function renderBookingForm(sessionLabel) {
       <div id="form-error"></div>
       <button class="btn" id="submit-btn" onclick="submitBooking()">Enviar pedido de marcação</button>
       <button class="btn-secondary" onclick="clearSlot()">Cancelar</button>
+      <p class="privacy-note">Os teus dados são utilizados exclusivamente para processar esta marcação, de acordo com a <a href="https://apora.app/privacidade" target="_blank">Política de Privacidade</a> da Apora.</p>
     </div>`;
 }
 
@@ -409,6 +412,7 @@ function renderInquiryOnly() {
       </div>
       <div id="req-error"></div>
       <button class="btn" onclick="submitRequest()">Enviar pedido</button>
+      <p class="privacy-note">Os teus dados são utilizados exclusivamente para processar este pedido, de acordo com a <a href="https://apora.app/privacidade" target="_blank">Política de Privacidade</a> da Apora.</p>
     </div>
     ${renderInfoSection()}
   `;
