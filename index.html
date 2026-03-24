@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apora — Marcação online</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0c0f0e; color: #e8e4dc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+    .container { max-width: 480px; margin: 0 auto; padding: 24px 16px 60px; }
+    .logo { font-family: Georgia, serif; font-size: 28px; color: #f4f2ee; margin-bottom: 4px; text-align: center; }
+    .subtitle { font-size: 13px; color: #9a968e; margin-bottom: 28px; text-align: center; }
+    .prof-name { font-size: 20px; font-weight: 600; color: #f4f2ee; margin-bottom: 24px; font-family: Georgia, serif; text-align: center; }
+    .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .week-nav button { background: #1e2623; border: none; color: #7ec89a; font-size: 24px; width: 40px; height: 40px; border-radius: 20px; cursor: pointer; }
+    .week-nav span { font-size: 14px; color: #9a968e; font-weight: 600; }
+    .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; }
+    .day-header { text-align: center; font-size: 11px; color: #9a968e; font-weight: 600; text-transform: uppercase; padding: 4px 0; }
+    .day-header.unavailable { color: #2a3530; text-decoration: line-through; }
+    .slots-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .slot { background: #1e2623; border-radius: 8px; padding: 8px 4px; text-align: center; font-size: 12px; color: #9a968e; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+    .slot.available { background: rgba(126,200,154,0.12); color: #7ec89a; cursor: pointer; border: 1px solid rgba(126,200,154,0.2); }
+    .slot.available:hover { background: rgba(126,200,154,0.25); }
+    .slot.occupied { background: #151a18; color: #1e2623; }
+    .slot.off { background: transparent; }
+    .slot.blocked { background: rgba(26,32,30,0.5); border-radius: 0; }
+    .slot.selected { background: #7ec89a; color: #0c0f0e; font-weight: 700; }
+    .type-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .type-chip { background: #1e2623; border: 1px solid #2a3530; border-radius: 10px; padding: 8px 14px; font-size: 13px; color: #9a968e; cursor: pointer; }
+    .type-chip.selected { background: rgba(126,200,154,0.15); border-color: rgba(126,200,154,0.4); color: #7ec89a; font-weight: 600; }
+    .form { background: #151a18; border-radius: 16px; padding: 20px; margin-top: 24px; }
+    .form h3 { font-size: 16px; font-weight: 600; color: #f4f2ee; margin-bottom: 4px; }
+    .form .selected-slot { font-size: 13px; color: #7ec89a; margin-bottom: 20px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 11px; color: #9a968e; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 6px; }
+    .field input, .field textarea { width: 100%; background: #1e2623; border: none; border-radius: 10px; padding: 12px 14px; color: #e8e4dc; font-size: 15px; outline: none; font-family: inherit; }
+    .field textarea { resize: none; min-height: 80px; line-height: 1.5; }
+    .field input::placeholder, .field textarea::placeholder { color: #9a968e; }
+    .field-hint { font-size: 11px; color: #9a968e; margin-top: 5px; line-height: 1.4; }
+    /* Sinal checkbox */
+    .sinal-box { background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+    .sinal-box input[type=checkbox] { width: 18px; height: 18px; margin-top: 2px; accent-color: #c9a84c; cursor: pointer; flex-shrink: 0; }
+    .sinal-box-text { flex: 1; }
+    .sinal-box-title { font-size: 14px; font-weight: 600; color: #c9a84c; margin-bottom: 3px; }
+    .sinal-box-desc { font-size: 12px; color: #9a968e; line-height: 1.5; }
+    /* Request form */
+    .request-form { background: #151a18; border-radius: 16px; padding: 20px; margin-top: 8px; }
+    .request-form h3 { font-size: 16px; font-weight: 600; color: #f4f2ee; margin-bottom: 4px; }
+    .request-form .desc { font-size: 13px; color: #9a968e; margin-bottom: 20px; line-height: 1.5; }
+    /* Info button */
+    .info-btn { width: 100%; background: transparent; border: 1px solid #2a3530; border-radius: 12px; padding: 14px; font-size: 14px; color: #9a968e; cursor: pointer; margin-top: 24px; font-family: inherit; }
+    .info-btn:hover { border-color: #7ec89a; color: #7ec89a; }
+    .info-form { background: #151a18; border-radius: 16px; padding: 20px; margin-top: 12px; }
+    .info-form h3 { font-size: 16px; font-weight: 600; color: #f4f2ee; margin-bottom: 4px; }
+    .info-form .desc { font-size: 13px; color: #9a968e; margin-bottom: 20px; }
+    .btn { width: 100%; background: #7ec89a; color: #0c0f0e; border: none; border-radius: 12px; padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; font-family: inherit; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { width: 100%; background: transparent; color: #9a968e; border: 1px solid #1c2320; border-radius: 12px; padding: 14px; font-size: 14px; cursor: pointer; margin-top: 8px; font-family: inherit; }
+    .btn-chat { width: 100%; background: rgba(126,200,154,0.1); color: #7ec89a; border: 1px solid rgba(126,200,154,0.3); border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 20px; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-chat:hover { background: rgba(126,200,154,0.18); }
+    .success { text-align: center; padding: 40px 20px; }
+    .success .icon { font-size: 48px; margin-bottom: 16px; }
+    .success h2 { font-size: 22px; font-weight: 700; color: #f4f2ee; font-family: Georgia, serif; margin-bottom: 8px; }
+    .success p { font-size: 14px; color: #9a968e; line-height: 1.5; }
+    .error-msg { background: rgba(232,168,109,0.1); border: 1px solid rgba(232,168,109,0.3); border-radius: 10px; padding: 12px 14px; color: #e8a86d; font-size: 13px; margin-top: 12px; }
+    .loading { text-align: center; padding: 60px 20px; color: #9a968e; }
+    .not-found { text-align: center; padding: 60px 20px; color: #9a968e; }
+    .mode-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; margin-left: 6px; vertical-align: middle; }
+    .mode-badge.sinal { background: rgba(201,168,76,0.15); color: #c9a84c; }
+    .mode-badge.pedido { background: rgba(111,179,210,0.15); color: #6fb3d2; }
+    .divider { height: 1px; background: #1e2623; margin: 24px 0; }
+    .section-title { font-size: 11px; color: #9a968e; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 12px; }
+    /* Chat */
+    .chat-container { background: #151a18; border-radius: 16px; padding: 0; overflow: hidden; margin-top: 8px; }
+    .chat-header { padding: 16px 20px; border-bottom: 1px solid #1e2623; display: flex; align-items: center; gap: 12px; }
+    .chat-header-back { background: none; border: none; color: #7ec89a; font-size: 20px; cursor: pointer; padding: 0; }
+    .chat-header-title { font-size: 15px; font-weight: 600; color: #f4f2ee; }
+    .chat-header-sub { font-size: 12px; color: #9a968e; margin-top: 2px; }
+    .chat-messages { padding: 16px; min-height: 300px; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background: #2a3530; border-radius: 2px; }
+    .msg { max-width: 82%; }
+    .msg.client { align-self: flex-end; }
+    .msg.professional { align-self: flex-start; }
+    .msg-bubble { padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+    .msg.client .msg-bubble { background: #7ec89a; color: #0c0f0e; border-bottom-right-radius: 4px; }
+    .msg.professional .msg-bubble { background: #1e2623; color: #e8e4dc; border-bottom-left-radius: 4px; }
+    .msg-time { font-size: 10px; color: #9a968e; margin-top: 3px; }
+    .msg.client .msg-time { text-align: right; }
+    .chat-empty { text-align: center; color: #9a968e; font-size: 13px; padding: 40px 0; }
+    .chat-input-row { padding: 12px 16px; border-top: 1px solid #1e2623; display: flex; gap: 10px; align-items: flex-end; }
+    .chat-input { flex: 1; background: #1e2623; border: none; border-radius: 20px; padding: 10px 16px; color: #e8e4dc; font-size: 14px; outline: none; font-family: inherit; resize: none; line-height: 1.4; max-height: 100px; overflow-y: auto; }
+    .chat-input::placeholder { color: #9a968e; }
+    .chat-send { background: #7ec89a; border: none; border-radius: 20px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">Apora</div>
+  <div class="subtitle">O momento certo</div>
+  <div id="app"><div class="loading">A carregar...</div></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://yeduhhhzbpzolzwwfeqj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllZHVoaGh6YnB6b2x6d3dmZXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NTc4NjksImV4cCI6MjA4OTUzMzg2OX0.0N62V5wTqqyBTwQuJ2xM7Q0OAxoXQGhAJk3VunTa2xs';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const DAYS_PT = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+let handle = window.location.pathname.replace(/^\//, '').split('/')[0] || '';
+let bookingInfo = null;
+let selectedSlot = null;
+let selectedType = null;
+let showInfoForm = false;
+let showChat = false;
+let chatData = null; // {conversation_id, client_name, prof_name, messages}
+let chatPollInterval = null;
+
+function getInitialWeekOffset() {
+  const d = new Date().getDay();
+  return (d === 0 || d === 6) ? 1 : 0;
+}
+let weekOffset = getInitialWeekOffset();
+
+function storageKey(k) { return `apora_${k}_${handle}`; }
+
+function getToken() {
+  let token = localStorage.getItem(storageKey('token'));
+  if (!token) {
+    token = crypto.randomUUID();
+    localStorage.setItem(storageKey('token'), token);
+  }
+  return token;
+}
+
+function hasExistingConversation() {
+  return !!localStorage.getItem(storageKey('conv_id'));
+}
+
+function toDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getMonday(offset = 0) {
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day + 1 + offset * 7);
+  monday.setHours(0,0,0,0);
+  return monday;
+}
+
+function getWeekDates(offset) {
+  const monday = getMonday(offset);
+  return Array.from({length: 7}, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+}
+
+function generateSlots(availability) {
+  const slots = [];
+  const [sh, sm] = availability.start.split(':').map(Number);
+  const [eh, em] = availability.end.split(':').map(Number);
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60 + em;
+  for (let m = startMin; m < endMin; m += availability.slot_duration) {
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    slots.push(`${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`);
+  }
+  return slots;
+}
+
+function getTypeMode(typeName) {
+  const modes = bookingInfo.session_type_modes || {};
+  return modes[typeName] || 'agendar';
+}
+
+function getVisibleTypes() {
+  const types = bookingInfo.session_types || [];
+  return types.filter(t => getTypeMode(t) !== 'desativado');
+}
+
+function currentMode() {
+  if (!selectedType) return 'agendar';
+  return getTypeMode(selectedType);
+}
+
+function formatTime(isoStr) {
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadBookingInfo() {
+  if (!handle) { renderNotFound(); return; }
+  const monday = getMonday(weekOffset);
+  const { data, error } = await sb.rpc('get_booking_info', {
+    p_handle: handle,
+    p_week_start: toDateStr(monday),
+  });
+  if (!data || error) { renderNotFound(); return; }
+  bookingInfo = data;
+  render();
+}
+
+function renderNotFound() {
+  document.getElementById('app').innerHTML = `
+    <div class="not-found">
+      <div style="font-size:48px;margin-bottom:16px">🔍</div>
+      <p>Profissional não encontrado.</p>
+    </div>`;
+}
+
+function timeToMin(t) {
+  const [h, m] = t.slice(0, 5).split(':').map(Number);
+  return h * 60 + m;
+}
+
+function render() {
+  if (showChat) {
+    renderChatView();
+    return;
+  }
+  const visibleTypes = getVisibleTypes();
+  if (visibleTypes.length === 0) {
+    renderInquiryOnly();
+    return;
+  }
+  const mode = currentMode();
+  if (selectedType && mode === 'so_pedido') {
+    renderRequestOnly();
+    return;
+  }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const visibleTypes = getVisibleTypes();
+  if (visibleTypes.length === 0) {
+    renderInquiryOnly();
+    return;
+  }
+  const av = bookingInfo.availability;
+  const occupied = bookingInfo.occupied || [];
+  const weekDates = getWeekDates(weekOffset);
+  const monday = weekDates[0];
+  const sunday = weekDates[6];
+  const slots = generateSlots(av);
+  const sessionLabel = bookingInfo.terminology?.session || 'sessão';
+  const slotDur = av.slot_duration;
+  const weekLabel = `${monday.getDate()} ${MONTHS_PT[monday.getMonth()]} – ${sunday.getDate()} ${MONTHS_PT[sunday.getMonth()]}`;
+  const today = toDateStr(new Date());
+
+  function isOverlapping(dateStr, slotTime) {
+    const slotStart = timeToMin(slotTime);
+    const slotEnd = slotStart + slotDur;
+    return occupied.some(o => {
+      if (o.date !== dateStr) return false;
+      const oStart = timeToMin(o.time);
+      const oDur = o.duration || slotDur;
+      return oStart < slotEnd && (oStart + oDur) > slotStart;
+    });
+  }
+
+  const blockedPeriods = bookingInfo.blocked_periods || [];
+  function isInBlockedPeriod(dateStr) {
+    return blockedPeriods.some(p => dateStr >= p.start && dateStr <= p.end);
+  }
+
+  const dayHeaders = weekDates.map((date, i) => {
+    const dateStr = toDateStr(date);
+    const isBlocked = isInBlockedPeriod(dateStr);
+    return `<div class="day-header${isBlocked ? ' unavailable' : ''}">${DAYS_PT[i]}</div>`;
+  }).join('');
+
+  let slotsHTML = '';
+  for (const time of slots) {
+    for (const date of weekDates) {
+      const dateStr = toDateStr(date);
+      const dayOfWeek = date.getDay();
+      const isWorkDay = av.days.includes(dayOfWeek);
+      const isOccupied = isOverlapping(dateStr, time);
+      const isPast = dateStr < today || (dateStr === today && time <= new Date().toTimeString().slice(0,5));
+      const isBlocked = isInBlockedPeriod(dateStr);
+      const isSelected = selectedSlot?.date === dateStr && selectedSlot?.time === time;
+
+      if (isBlocked) {
+        slotsHTML += `<div class="slot blocked"></div>`;
+      } else if (!isWorkDay || isPast) {
+        slotsHTML += `<div class="slot off"></div>`;
+      } else if (isOccupied) {
+        slotsHTML += `<div class="slot occupied"></div>`;
+      } else {
+        slotsHTML += `<div class="${isSelected ? 'slot available selected' : 'slot available'}" onclick="selectSlot('${dateStr}','${time}')">${time}</div>`;
+      }
+    }
+  }
+
+  let typeSection = '';
+  if (visibleTypes.length > 1) {
+    const chipsHTML = visibleTypes.map(t => {
+      const mode = getTypeMode(t);
+      const badge = mode === 'com_sinal'
+        ? '<span class="mode-badge sinal">Sinal</span>'
+        : mode === 'so_pedido'
+        ? '<span class="mode-badge pedido">Pedido</span>'
+        : '';
+      return `<div class="type-chip${selectedType === t ? ' selected' : ''}" onclick="selectType('${t}')">${t}${badge}</div>`;
+    }).join('');
+    typeSection = `
+      <div class="section-title">Tipo de ${sessionLabel}</div>
+      <div class="type-chips">${chipsHTML}</div>`;
+  }
+
+  const chatBtn = hasExistingConversation()
+    ? `<button class="btn-chat" onclick="openChat()">💬 As minhas mensagens</button>`
+    : '';
+
+  document.getElementById('app').innerHTML = `
+    <div class="prof-name">${bookingInfo.name}</div>
+    ${chatBtn}
+    ${typeSection}
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)">‹</button>
+      <span>${weekLabel}</span>
+      <button onclick="changeWeek(1)">›</button>
+    </div>
+    <div class="days-grid">${dayHeaders}</div>
+    <div class="slots-grid">${slotsHTML}</div>
+    ${selectedSlot ? renderBookingForm(sessionLabel) : ''}
+    ${renderInfoSection()}
+  `;
+}
+
+function renderBookingForm(sessionLabel) {
+  const [y,m,d] = selectedSlot.date.split('-');
+  const mode = currentMode();
+  const isSinal = mode === 'com_sinal';
+
+  const descField = isSinal ? `
+    <div class="field">
+      <label>Descrição do trabalho</label>
+      <textarea id="inp-notes" placeholder="Descreve o que pretendes — tamanho, estilo, localização no corpo, referências…"></textarea>
+    </div>` : '';
+
+  const sinalCheckbox = isSinal ? `
+    <label class="sinal-box" for="inp-sinal">
+      <input type="checkbox" id="inp-sinal" />
+      <div class="sinal-box-text">
+        <div class="sinal-box-title">Sinal pago</div>
+        <div class="sinal-box-desc">Confirmo que já transferi o sinal combinado com ${bookingInfo.name}. A marcação só será confirmada após verificação.</div>
+      </div>
+    </label>` : '';
+
+  return `
+    <div class="form">
+      <h3>${isSinal ? 'Confirmar marcação' : `Nova ${sessionLabel}`}</h3>
+      <div class="selected-slot">${d}/${m}/${y} às ${selectedSlot.time}</div>
+      <div class="field">
+        <label>Nome</label>
+        <input id="inp-name" type="text" placeholder="O teu nome" />
+      </div>
+      <div class="field">
+        <label>Email <span style="color:#e88a6d">*</span></label>
+        <input id="inp-email" type="email" placeholder="o.teu@email.com" />
+        <div class="field-hint">📩 Receberás a confirmação (ou rejeição) da marcação por email.</div>
+      </div>
+      <div class="field">
+        <label>Telefone</label>
+        <input id="inp-phone" type="tel" placeholder="+351 912 345 678" />
+      </div>
+      ${descField}
+      ${sinalCheckbox}
+      <div id="form-error"></div>
+      <button class="btn" id="submit-btn" onclick="submitBooking()">Enviar pedido de marcação</button>
+      <button class="btn-secondary" onclick="clearSlot()">Cancelar</button>
+    </div>`;
+}
+
+function renderInquiryOnly() {
+  document.getElementById('app').innerHTML = `
+    <div class="prof-name">${bookingInfo.name}</div>
+    <div class="request-form">
+      <h3>Marcações por pedido</h3>
+      <p class="desc">${bookingInfo.name} não tem marcações directas disponíveis de momento. Envia um pedido e será contactado/a.</p>
+      <div class="field">
+        <label>Nome</label>
+        <input id="req-name" type="text" placeholder="O teu nome" />
+      </div>
+      <div class="field">
+        <label>Email *</label>
+        <input id="req-email" type="email" placeholder="o.teu@email.com" />
+        <div class="field-hint">Necessário para receberes resposta e poderes enviar mensagens.</div>
+      </div>
+      <div class="field">
+        <label>Telefone</label>
+        <input id="req-phone" type="tel" placeholder="+351 912 345 678" />
+      </div>
+      <div class="field">
+        <label>Mensagem</label>
+        <textarea id="req-notes" placeholder="Descreve o que pretendes…"></textarea>
+      </div>
+      <div id="req-error"></div>
+      <button class="btn" onclick="submitRequest()">Enviar pedido</button>
+    </div>
+    ${renderInfoSection()}
+  `;
+}
+
+function renderRequestOnly() {
+  document.getElementById('app').innerHTML = `
+    <div class="prof-name">${bookingInfo.name}</div>
+    <div class="type-chips">
+      ${getVisibleTypes().map(t => {
+        const mode = getTypeMode(t);
+        const badge = mode === 'com_sinal' ? '<span class="mode-badge sinal">Sinal</span>'
+          : mode === 'so_pedido' ? '<span class="mode-badge pedido">Pedido</span>' : '';
+        return `<div class="type-chip${selectedType === t ? ' selected' : ''}" onclick="selectType('${t}')">${t}${badge}</div>`;
+      }).join('')}
+    </div>
+    <div class="request-form">
+      <h3>Pedido de marcação</h3>
+      <p class="desc">${bookingInfo.name} irá analisar o teu pedido e entrar em contacto para combinar data e hora.</p>
+      <div class="field">
+        <label>Nome</label>
+        <input id="req-name" type="text" placeholder="O teu nome" />
+      </div>
+      <div class="field">
+        <label>Email *</label>
+        <input id="req-email" type="email" placeholder="o.teu@email.com" />
+        <div class="field-hint">Necessário para receberes resposta e poderes enviar mensagens.</div>
+      </div>
+      <div class="field">
+        <label>Telefone</label>
+        <input id="req-phone" type="tel" placeholder="+351 912 345 678" />
+      </div>
+      <div class="field">
+        <label>Descrição do trabalho</label>
+        <textarea id="req-notes" placeholder="Descreve o que pretendes — tamanho, estilo, localização, referências…"></textarea>
+      </div>
+      <div id="req-error"></div>
+      <button class="btn" onclick="submitRequest()">Enviar pedido</button>
+      <button class="btn-secondary" onclick="clearType()">Voltar</button>
+    </div>
+    ${renderInfoSection()}
+  `;
+}
+
+function renderInfoSection() {
+  if (showInfoForm) {
+    return `
+      <div class="divider"></div>
+      <div class="info-form">
+        <h3>Pedir informação</h3>
+        <p class="desc">Envia uma mensagem directa a ${bookingInfo?.name ?? 'este profissional'}.</p>
+        <div class="field">
+          <label>Nome</label>
+          <input id="info-name" type="text" placeholder="O teu nome" />
+        </div>
+        <div class="field">
+          <label>Email *</label>
+          <input id="info-email" type="email" placeholder="o.teu@email.com" />
+          <div class="field-hint">Necessário para receberes resposta e continuares a conversa.</div>
+        </div>
+        <div class="field">
+          <label>Telefone (opcional)</label>
+          <input id="info-phone" type="tel" placeholder="+351 912 345 678" />
+        </div>
+        <div class="field">
+          <label>Mensagem</label>
+          <textarea id="info-msg" placeholder="A tua dúvida ou questão…"></textarea>
+        </div>
+        <div id="info-error"></div>
+        <button class="btn" onclick="submitInquiry()">Enviar mensagem</button>
+        <button class="btn-secondary" onclick="toggleInfoForm()">Cancelar</button>
+      </div>`;
+  }
+  return `<button class="info-btn" onclick="toggleInfoForm()">Pedir informação</button>`;
+}
+
+function toggleInfoForm() {
+  showInfoForm = !showInfoForm;
+  render();
+  if (showInfoForm) {
+    setTimeout(() => document.querySelector('.info-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+}
+
+function selectType(t) {
+  selectedType = t;
+  selectedSlot = null;
+  render();
+  setTimeout(() => {
+    const el = document.querySelector('.request-form, .week-nav');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
+function clearType() {
+  selectedType = null;
+  selectedSlot = null;
+  render();
+}
+
+function selectSlot(date, time) {
+  selectedSlot = { date, time };
+  renderCalendar();
+  setTimeout(() => {
+    document.querySelector('.form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function clearSlot() {
+  selectedSlot = null;
+  renderCalendar();
+}
+
+function changeWeek(delta) {
+  weekOffset += delta;
+  selectedSlot = null;
+  loadBookingInfo();
+}
+
+async function submitBooking() {
+  const name = document.getElementById('inp-name')?.value.trim();
+  const email = document.getElementById('inp-email')?.value.trim();
+  const phone = document.getElementById('inp-phone')?.value.trim();
+  const notes = document.getElementById('inp-notes')?.value.trim() || null;
+  const sinalDeclared = document.getElementById('inp-sinal')?.checked || false;
+  const btn = document.getElementById('submit-btn');
+  const errEl = document.getElementById('form-error');
+
+  if (!selectedType) { errEl.innerHTML = '<div class="error-msg">Selecciona o tipo de sessão antes de continuar.</div>'; return; }
+  if (!name) { errEl.innerHTML = '<div class="error-msg">Insere o teu nome.</div>'; return; }
+  if (!email) { errEl.innerHTML = '<div class="error-msg">O email é obrigatório para receberes a confirmação.</div>'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.innerHTML = '<div class="error-msg">Insere um email válido.</div>'; return; }
+
+  const mode = currentMode();
+  if (mode === 'com_sinal' && !sinalDeclared) {
+    errEl.innerHTML = '<div class="error-msg">Confirma que já enviaste o sinal antes de prosseguir.</div>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'A enviar...';
+  errEl.innerHTML = '';
+
+  const token = getToken();
+
+  const { data, error } = await sb.rpc('create_booking', {
+    p_handle: handle,
+    p_date: selectedSlot.date,
+    p_time: selectedSlot.time,
+    p_client_name: name,
+    p_client_phone: phone || null,
+    p_type: selectedType || null,
+    p_booking_notes: notes,
+    p_sinal_declared: sinalDeclared,
+    p_client_email: email,
+    p_client_token: token,
+  });
+
+  if (error || data?.error) {
+    errEl.innerHTML = `<div class="error-msg">${data?.error || 'Não foi possível realizar a marcação. Tenta novamente.'}</div>`;
+    errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    btn.disabled = false;
+    btn.textContent = 'Enviar pedido de marcação';
+    return;
+  }
+
+  renderSuccessBooking(name, sinalDeclared);
+}
+
+async function submitRequest() {
+  const name = document.getElementById('req-name')?.value.trim();
+  const email = document.getElementById('req-email')?.value.trim();
+  const phone = document.getElementById('req-phone')?.value.trim();
+  const notes = document.getElementById('req-notes')?.value.trim();
+  const errEl = document.getElementById('req-error');
+
+  if (!name) { errEl.innerHTML = '<div class="error-msg">Insere o teu nome.</div>'; return; }
+  if (!email) { errEl.innerHTML = '<div class="error-msg">O email é obrigatório para receberes resposta.</div>'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.innerHTML = '<div class="error-msg">Insere um email válido.</div>'; return; }
+  if (!notes && selectedType) { errEl.innerHTML = '<div class="error-msg">Descreve o trabalho que pretendes.</div>'; return; }
+
+  const token = getToken();
+  const messageText = selectedType ? `[${selectedType}] ${notes}` : (notes || '(sem mensagem)');
+
+  const { data, error } = await sb.rpc('create_inquiry', {
+    p_handle: handle,
+    p_client_name: name,
+    p_client_phone: phone || null,
+    p_message: messageText,
+    p_client_email: email,
+    p_client_token: token,
+  });
+
+  if (error || data?.error) {
+    document.getElementById('req-error').innerHTML = `<div class="error-msg">Não foi possível enviar. Tenta novamente.</div>`;
+    return;
+  }
+
+  if (data?.conversation_id) {
+    localStorage.setItem(storageKey('conv_id'), data.conversation_id);
+  }
+
+  renderSuccessInquiry(name, !!data?.conversation_id);
+}
+
+async function submitInquiry() {
+  const name = document.getElementById('info-name')?.value.trim();
+  const email = document.getElementById('info-email')?.value.trim();
+  const phone = document.getElementById('info-phone')?.value.trim();
+  const msg = document.getElementById('info-msg')?.value.trim();
+  const errEl = document.getElementById('info-error');
+
+  if (!name) { errEl.innerHTML = '<div class="error-msg">Insere o teu nome.</div>'; return; }
+  if (!email) { errEl.innerHTML = '<div class="error-msg">O email é obrigatório para receberes resposta.</div>'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.innerHTML = '<div class="error-msg">Insere um email válido.</div>'; return; }
+  if (!msg) { errEl.innerHTML = '<div class="error-msg">Escreve a tua mensagem.</div>'; return; }
+
+  const token = getToken();
+
+  const { data, error } = await sb.rpc('create_inquiry', {
+    p_handle: handle,
+    p_client_name: name,
+    p_client_phone: phone || null,
+    p_message: msg,
+    p_client_email: email,
+    p_client_token: token,
+  });
+
+  if (error || data?.error) {
+    errEl.innerHTML = `<div class="error-msg">Não foi possível enviar. Tenta novamente.</div>`;
+    return;
+  }
+
+  if (data?.conversation_id) {
+    localStorage.setItem(storageKey('conv_id'), data.conversation_id);
+  }
+
+  showInfoForm = false;
+  renderSuccessInquiry(name, !!data?.conversation_id);
+}
+
+function renderSuccessBooking(name, sinalDeclared) {
+  const extra = sinalDeclared
+    ? '<br><br>Como declaraste o sinal pago, a confirmação ficará pendente da verificação do pagamento.'
+    : '';
+  document.getElementById('app').innerHTML = `
+    <div class="success">
+      <div class="icon">✓</div>
+      <h2>Pedido enviado!</h2>
+      <p>${name}, a tua marcação foi recebida e aguarda confirmação.${extra}</p>
+    </div>`;
+}
+
+function renderSuccessInquiry(name, hasChat) {
+  const chatBtn = hasChat
+    ? `<button class="btn" style="margin-top:20px" onclick="openChat()">💬 Ver mensagens</button>`
+    : '';
+  document.getElementById('app').innerHTML = `
+    <div class="success">
+      <div class="icon">✉️</div>
+      <h2>Mensagem enviada!</h2>
+      <p>${name}, a tua mensagem foi recebida.<br><br>${bookingInfo?.name ?? 'O profissional'} irá responder em breve.</p>
+      ${chatBtn}
+    </div>`;
+}
+
+// ---- CHAT ----
+
+async function openChat() {
+  const token = localStorage.getItem(storageKey('token'));
+  if (!token) return;
+
+  showChat = true;
+  document.getElementById('app').innerHTML = `<div class="loading">A carregar conversa...</div>`;
+
+  const { data, error } = await sb.rpc('get_or_create_conversation', {
+    p_token: token,
+    p_handle: handle,
+  });
+
+  if (error || data?.error || !data?.conversation_id) {
+    document.getElementById('app').innerHTML = `
+      <div class="not-found">
+        <p>Não foi possível carregar a conversa.</p>
+        <button class="btn-secondary" style="margin-top:16px" onclick="closeChat()">Voltar</button>
+      </div>`;
+    return;
+  }
+
+  chatData = data;
+  renderChatView();
+  startChatPolling();
+}
+
+function closeChat() {
+  showChat = false;
+  chatData = null;
+  stopChatPolling();
+  render();
+}
+
+function renderChatView() {
+  if (!chatData) return;
+  const msgs = chatData.messages || [];
+
+  const msgsHTML = msgs.length === 0
+    ? `<div class="chat-empty">Nenhuma mensagem ainda.</div>`
+    : msgs.map(m => `
+      <div class="msg ${m.sender}">
+        <div class="msg-bubble">${escapeHtml(m.body)}</div>
+        <div class="msg-time">${formatTime(m.created_at)}</div>
+      </div>`).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="chat-container">
+      <div class="chat-header">
+        <button class="chat-header-back" onclick="closeChat()">←</button>
+        <div>
+          <div class="chat-header-title">${escapeHtml(chatData.prof_name ?? bookingInfo?.name ?? '')}</div>
+          <div class="chat-header-sub">${escapeHtml(chatData.client_name)}</div>
+        </div>
+      </div>
+      <div class="chat-messages" id="chat-msgs">${msgsHTML}</div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" placeholder="Mensagem…" rows="1"
+          onkeydown="handleChatKey(event)"></textarea>
+        <button class="chat-send" id="chat-send-btn" onclick="sendChatMessage()">↑</button>
+      </div>
+    </div>`;
+
+  scrollChatToBottom();
+}
+
+function scrollChatToBottom() {
+  setTimeout(() => {
+    const el = document.getElementById('chat-msgs');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 50);
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('chat-send-btn');
+  if (!input || !chatData) return;
+
+  const body = input.value.trim();
+  if (!body) return;
+
+  input.value = '';
+  btn.disabled = true;
+
+  const token = localStorage.getItem(storageKey('token'));
+
+  const { data, error } = await sb.rpc('send_client_message', {
+    p_token: token,
+    p_conversation_id: chatData.conversation_id,
+    p_body: body,
+  });
+
+  btn.disabled = false;
+
+  if (error || data?.error) {
+    input.value = body; // restore
+    return;
+  }
+
+  // Optimistic: add to local messages
+  chatData.messages = chatData.messages || [];
+  chatData.messages.push({
+    id: Date.now(),
+    sender: 'client',
+    body,
+    created_at: new Date().toISOString(),
+  });
+  renderChatView();
+}
+
+async function pollChat() {
+  if (!chatData || !showChat) return;
+  const token = localStorage.getItem(storageKey('token'));
+  if (!token) return;
+
+  const { data } = await sb.rpc('get_or_create_conversation', {
+    p_token: token,
+    p_handle: handle,
+  });
+
+  if (data?.messages && data.messages.length !== (chatData.messages || []).length) {
+    chatData = data;
+    renderChatView();
+  }
+}
+
+function startChatPolling() {
+  stopChatPolling();
+  chatPollInterval = setInterval(pollChat, 5000);
+}
+
+function stopChatPolling() {
+  if (chatPollInterval) {
+    clearInterval(chatPollInterval);
+    chatPollInterval = null;
+  }
+}
+
+loadBookingInfo();
+</script>
+</body>
+</html>
