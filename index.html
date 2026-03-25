@@ -250,6 +250,10 @@ function renderCalendar() {
     return;
   }
   const av = bookingInfo.availability;
+  if (!av || !av.start || !av.end || !av.days || av.days.length === 0) {
+    renderInquiryOnly();
+    return;
+  }
   const occupied = bookingInfo.occupied || [];
   const weekDates = getWeekDates(weekOffset);
   const monday = weekDates[0];
