@@ -181,7 +181,8 @@ function generateSlots(availability) {
 }
 
 function getTypeMode(typeName) {
-  const modes = bookingInfo.session_type_modes || {};
+  let modes = bookingInfo.session_type_modes || {};
+  if (typeof modes === 'string') { try { modes = JSON.parse(modes); } catch { modes = {}; } }
   return modes[typeName] || 'agendar';
 }
 
