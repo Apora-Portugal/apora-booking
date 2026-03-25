@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apora — Reel Slides</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
+    gap: 20px;
+  }
+
+  /* Container 9:16 */
+  #stage {
+    width: min(405px, 90vw);
+    aspect-ratio: 9 / 16;
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.7);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  /* Slide base */
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 44px 28px 36px;
+    opacity: 0;
+    transform: scale(1.03);
+    transition: opacity 0.55s cubic-bezier(0.4,0,0.2,1), transform 0.55s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+    background: #0c0f0e;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: all;
+  }
+
+  /* Progress bar */
+  #progress-bar {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 24px;
+  }
+  .prog-seg {
+    flex: 1;
+    height: 2px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .prog-seg-fill {
+    height: 100%;
+    background: #7ec89a;
+    width: 0%;
+    border-radius: 2px;
+    transition: width linear;
+  }
+  .prog-seg-fill.done { width: 100%; transition: none; }
+
+  /* Controls */
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  button.ctrl {
+    background: #1a2020;
+    border: 1px solid #1e2e28;
+    color: #d4cfc8;
+    border-radius: 10px;
+    padding: 8px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  button.ctrl:hover { background: #243028; }
+  #slide-num { font-size: 12px; color: #6b7870; }
+
+  /* ── SLIDE 1 — HERO ────────────────────── */
+  #s1 { background: #0c0f0e; }
+  #s1 .hero-logo {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 8px;
+  }
+  #s1 .logo-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    background: #7ec89a; display: flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif; font-size: 26px; font-weight: 700; color: #0c0f0e;
+  }
+  #s1 .logo-name {
+    font-family: Georgia, serif; font-size: 34px; font-weight: 700; color: #f0ede8;
+  }
+  #s1 .hero-sub {
+    font-size: 13px; color: #7ec89a; letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 0;
+  }
+  #s1 .glow {
+    position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+    width: 280px; height: 280px;
+    background: radial-gradient(ellipse, rgba(126,200,154,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  #s1 .hero-main {
+    flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px;
+    position: relative; z-index: 1;
+  }
+  #s1 .hero-title {
+    font-family: Georgia, serif; font-size: 38px; font-weight: 700;
+    color: #f0ede8; line-height: 1.2; letter-spacing: -0.5px;
+  }
+  #s1 .hero-title span { color: #7ec89a; }
+  #s1 .hero-desc {
+    font-size: 15px; color: #9a968e; line-height: 1.7; max-width: 300px;
+  }
+  #s1 .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(126,200,154,0.1); border: 1px solid rgba(126,200,154,0.3);
+    border-radius: 100px; padding: 8px 16px; width: fit-content;
+  }
+  #s1 .hero-badge-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #7ec89a;
+  }
+  #s1 .hero-badge-text { font-size: 13px; color: #7ec89a; font-weight: 500; }
+  #s1 .hero-professions {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+  }
+  #s1 .prof-chip {
+    font-size: 12px; color: #9a968e;
+    border: 1px solid #1e2e28; border-radius: 100px; padding: 5px 14px;
+    background: #111914;
+  }
+  #s1 .hero-url {
+    font-size: 13px; color: #4a5e54; letter-spacing: 0.3px; margin-top: 12px;
+  }
+
+  /* ── SLIDE 2 & 3 — HOJE ─────────────────── */
+  .slide-hoje { background: #0c0f0e; }
+  .phone-shell {
+    flex: 1; display: flex; flex-direction: column; gap: 0;
+    background: #111914; border-radius: 20px; overflow: hidden;
+    border: 1px solid #1e2e28;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .phone-statusbar {
+    padding: 12px 18px 8px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: #6b7870;
+  }
+  .phone-content { flex: 1; padding: 0 16px 16px; overflow: hidden; }
+  .app-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 10px 0 16px;
+  }
+  .app-date { font-size: 11px; color: #6b7870; margin-bottom: 3px; }
+  .app-greeting { font-family: Georgia, serif; font-size: 18px; color: #f0ede8; }
+  .app-avatar {
+    width: 34px; height: 34px; border-radius: 17px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #0c0f0e; background: #7ec89a;
+    flex-shrink: 0;
+  }
+  .stat-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px;
+  }
+  .stat-card {
+    background: #151c18; border: 1px solid #1e2e28; border-radius: 10px;
+    padding: 10px 11px;
+  }
+  .stat-label { font-size: 9px; color: #6b7870; margin-bottom: 4px; }
+  .stat-value { font-size: 18px; font-weight: 700; color: #f0ede8; }
+  .session-list { display: flex; flex-direction: column; gap: 7px; }
+  .session-row {
+    background: #151c18; border: 1px solid #1e2e28; border-radius: 9px;
+    padding: 10px 12px; display: flex; align-items: center; gap: 11px;
+  }
+  .session-bar { width: 3px; height: 32px; border-radius: 2px; flex-shrink: 0; }
+  .session-name { font-size: 12px; font-weight: 600; color: #f0ede8; }
+  .session-type { font-size: 10px; color: #6b7870; margin-top: 1px; }
+  .session-time { font-size: 10px; color: #6b7870; margin-left: auto; flex-shrink: 0; }
+  .session-status { font-size: 9px; font-weight: 500; }
+  .phone-tabbar {
+    display: flex; border-top: 1px solid #1e2e28;
+    padding: 10px 8px 14px;
+    background: #0e1511;
+  }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .tab-icon { font-size: 16px; }
+  .tab-label { font-size: 8px; color: #4a5e54; }
+  .tab-item.active .tab-label { color: #7ec89a; }
+  .slide-label {
+    font-size: 11px; color: #4a5e54; letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* ── SLIDE 4 — NOVA MARCAÇÃO ─────────────── */
+  #s4 { background: #0c0f0e; }
+  .form-shell {
+    flex: 1; background: #111914; border-radius: 20px;
+    border: 1px solid #1e2e28; overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .form-header {
+    padding: 16px 18px 14px; border-bottom: 1px solid #1e2e28;
+    font-family: Georgia, serif; font-size: 17px; color: #f0ede8;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .form-header-back { font-size: 18px; color: #7ec89a; }
+  .form-body { flex: 1; padding: 16px 18px; display: flex; flex-direction: column; gap: 13px; }
+  .form-field { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 10px; color: #6b7870; letter-spacing: 0.5px; text-transform: uppercase; }
+  .form-value {
+    background: #151c18; border: 1px solid #1e2e28; border-radius: 8px;
+    padding: 10px 12px; font-size: 13px; color: #d4cfc8;
+  }
+  .form-value.placeholder { color: #3a4e44; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 5px 12px; border-radius: 100px; font-size: 11px;
+    border: 1px solid #1e2e28; color: #6b7870; background: #151c18;
+  }
+  .chip.active { background: rgba(126,200,154,0.15); border-color: #7ec89a; color: #7ec89a; }
+  .form-btn {
+    margin: 0 18px 18px; background: #7ec89a; border-radius: 12px;
+    padding: 13px; text-align: center; font-size: 14px; font-weight: 600; color: #0c0f0e;
+  }
+
+  /* ── SLIDE 5 — CLIENTES ─────────────────── */
+  #s5 { background: #0c0f0e; }
+  .client-shell {
+    flex: 1; background: #111914; border-radius: 20px;
+    border: 1px solid #1e2e28; overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .client-header {
+    padding: 14px 16px; border-bottom: 1px solid #1e2e28;
+    font-family: Georgia, serif; font-size: 17px; color: #f0ede8;
+  }
+  .client-search {
+    margin: 12px 14px 8px; background: #151c18;
+    border: 1px solid #1e2e28; border-radius: 8px; padding: 9px 12px;
+    font-size: 12px; color: #3a4e44;
+  }
+  .client-row {
+    padding: 10px 14px; display: flex; align-items: center; gap: 11px;
+    border-bottom: 1px solid #111914;
+  }
+  .client-avatar {
+    width: 34px; height: 34px; border-radius: 17px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #0c0f0e; flex-shrink: 0;
+  }
+  .client-name { font-size: 13px; color: #f0ede8; font-weight: 500; }
+  .client-meta { font-size: 10px; color: #6b7870; margin-top: 1px; }
+  .client-next { font-size: 9px; color: #7ec89a; margin-left: auto; flex-shrink: 0; }
+
+  /* ── SLIDE 6 — BOOKING ─────────────────── */
+  #s6 { background: #0c0f0e; }
+  .booking-shell {
+    flex: 1; background: #111914; border-radius: 20px;
+    border: 1px solid #1e2e28; overflow: hidden; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .booking-url-bar {
+    padding: 10px 14px; background: #0e1511; border-bottom: 1px solid #1e2e28;
+    font-size: 10px; color: #4a5e54; text-align: center; letter-spacing: 0.3px;
+  }
+  .booking-url-bar span { color: #7ec89a; }
+  .booking-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  .booking-prof {
+    text-align: center;
+    font-family: Georgia, serif; font-size: 18px; color: #f0ede8;
+  }
+  .booking-prof-sub { font-size: 11px; color: #6b7870; text-align: center; margin-top: 2px; }
+  .booking-types { display: flex; flex-wrap: wrap; gap: 7px; }
+  .booking-type {
+    padding: 7px 14px; border-radius: 100px; font-size: 11px;
+    border: 1px solid #1e2e28; color: #9a968e; background: #151c18;
+  }
+  .booking-type.selected { border-color: #7ec89a; color: #7ec89a; background: rgba(126,200,154,0.1); }
+  .week-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  }
+  .week-day {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  .week-day-label { font-size: 8px; color: #4a5e54; }
+  .week-day-dot {
+    width: 28px; height: 28px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: #6b7870; background: #151c18; border: 1px solid #1a2820;
+  }
+  .week-day-dot.has-slots { color: #f0ede8; border-color: #1e2e28; }
+  .week-day-dot.selected { background: #7ec89a; color: #0c0f0e; border-color: #7ec89a; }
+  .booking-slots { display: flex; flex-wrap: wrap; gap: 6px; }
+  .booking-slot {
+    padding: 6px 12px; border-radius: 8px; font-size: 11px;
+    border: 1px solid #1e2e28; color: #6b7870; background: #151c18;
+  }
+  .booking-slot.selected { border-color: #7ec89a; color: #7ec89a; }
+  .booking-btn {
+    background: #7ec89a; border-radius: 10px; padding: 11px;
+    text-align: center; font-size: 13px; font-weight: 600; color: #0c0f0e;
+    margin-top: auto;
+  }
+
+  /* ── SLIDE 7 — CTA ──────────────────────── */
+  #s7 { background: #0c0f0e; justify-content: center; align-items: center; text-align: center; }
+  #s7 .glow2 {
+    position: absolute; top: 30%; left: 50%; transform: translate(-50%,-50%);
+    width: 350px; height: 350px;
+    background: radial-gradient(ellipse, rgba(126,200,154,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  #s7 .cta-content { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 0 16px; }
+  #s7 .cta-icon {
+    width: 72px; height: 72px; border-radius: 20px; background: #7ec89a;
+    display: flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif; font-size: 36px; font-weight: 700; color: #0c0f0e;
+    box-shadow: 0 16px 40px rgba(126,200,154,0.3);
+  }
+  #s7 .cta-title {
+    font-family: Georgia, serif; font-size: 34px; font-weight: 700;
+    color: #f0ede8; line-height: 1.2; letter-spacing: -0.5px;
+  }
+  #s7 .cta-title span { color: #7ec89a; }
+  #s7 .cta-desc { font-size: 14px; color: #9a968e; line-height: 1.7; max-width: 280px; }
+  #s7 .cta-btn {
+    background: #7ec89a; color: #0c0f0e; border-radius: 14px;
+    padding: 15px 36px; font-size: 15px; font-weight: 700; width: 100%;
+    letter-spacing: 0.2px;
+  }
+  #s7 .cta-url {
+    font-size: 13px; color: #4a5e54; letter-spacing: 0.3px;
+  }
+  #s7 .cta-profs {
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  }
+  #s7 .cta-prof { font-size: 20px; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <!-- SLIDE 1 — HERO -->
+  <div class="slide active" id="s1">
+    <div id="progress-bar"></div>
+    <div class="glow"></div>
+
+    <div class="hero-logo">
+      <div class="logo-icon">A</div>
+      <span class="logo-name">Apora</span>
+    </div>
+    <div class="hero-sub">gestão de agenda</div>
+
+    <div class="hero-main">
+      <div class="hero-title">
+        O momento <span>certo</span> para o teu negócio.
+      </div>
+      <div class="hero-desc">
+        Agenda, clientes, pagamentos e marcações online — tudo num só lugar.
+      </div>
+      <div class="hero-badge">
+        <div class="hero-badge-dot"></div>
+        <span class="hero-badge-text">Beta gratuito disponível</span>
+      </div>
+      <div class="hero-professions">
+        <span class="prof-chip">🧠 Psicólogos</span>
+        <span class="prof-chip">✂️ Barbeiros</span>
+        <span class="prof-chip">🎨 Tatuadores</span>
+        <span class="prof-chip">🗂️ Gestores</span>
+      </div>
+    </div>
+
+    <div class="hero-url">apora.app</div>
+  </div>
+
+  <!-- SLIDE 2 — HOJE PSICÓLOGA -->
+  <div class="slide slide-hoje" id="s2">
+    <div id="progress-bar2"></div>
+    <div class="slide-label">Ecrã Hoje</div>
+    <div class="phone-shell">
+      <div class="phone-statusbar">
+        <span>09:41</span><span>●●●</span>
+      </div>
+      <div class="phone-content">
+        <div class="app-header">
+          <div>
+            <div class="app-date">terça-feira, 24 de março</div>
+            <div class="app-greeting">Bom dia, Sofia 👋</div>
+          </div>
+          <div class="app-avatar">S</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-label">Consultas</div><div class="stat-value">3</div></div>
+          <div class="stat-card"><div class="stat-label">Receita</div><div class="stat-value">€225</div></div>
+          <div class="stat-card"><div class="stat-label">Horas</div><div class="stat-value">3h</div></div>
+        </div>
+        <div class="session-list">
+          <div class="session-row">
+            <div class="session-bar" style="background:#7ec89a"></div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between">
+                <div class="session-name">Ana Sousa</div>
+                <div class="session-time">09:00</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:1px">
+                <div class="session-type">Individual · 60min</div>
+                <div class="session-status" style="color:#7ec89a">Pago</div>
+              </div>
+            </div>
+          </div>
+          <div class="session-row">
+            <div class="session-bar" style="background:#9b7ec8"></div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between">
+                <div class="session-name">João Ferreira</div>
+                <div class="session-time">10:00</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:1px">
+                <div class="session-type">Casal · 60min</div>
+                <div class="session-status" style="color:#9b7ec8">Na Plataforma</div>
+              </div>
+            </div>
+          </div>
+          <div class="session-row">
+            <div class="session-bar" style="background:#e8a86d"></div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between">
+                <div class="session-name">Maria Costa</div>
+                <div class="session-time">11:30</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:1px">
+                <div class="session-type">Individual · 45min</div>
+                <div class="session-status" style="color:#e8a86d">Pendente</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-tabbar">
+        <div class="tab-item active"><div class="tab-icon">☀️</div><div class="tab-label" style="color:#7ec89a">Hoje</div></div>
+        <div class="tab-item"><div class="tab-icon">📅</div><div class="tab-label">Agenda</div></div>
+        <div class="tab-item"><div class="tab-icon">＋</div><div class="tab-label">Nova</div></div>
+        <div class="tab-item"><div class="tab-icon">👤</div><div class="tab-label">Pacientes</div></div>
+        <div class="tab-item"><div class="tab-icon">💬</div><div class="tab-label">Chat</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3 — HOJE BARBEIRO -->
+  <div class="slide slide-hoje" id="s3">
+    <div class="slide-label">Para cada profissão</div>
+    <div class="phone-shell">
+      <div class="phone-statusbar">
+        <span>09:41</span><span>●●●</span>
+      </div>
+      <div class="phone-content">
+        <div class="app-header">
+          <div>
+            <div class="app-date">terça-feira, 24 de março</div>
+            <div class="app-greeting">Bom dia, Ferreira 👋</div>
+          </div>
+          <div class="app-avatar" style="background:#c9a84c">F</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-label">Marcações</div><div class="stat-value">4</div></div>
+          <div class="stat-card"><div class="stat-label">Receita</div><div class="stat-value">€80</div></div>
+          <div class="stat-card"><div class="stat-label">Horas</div><div class="stat-value">2h30</div></div>
+        </div>
+        <div class="session-list">
+          <div class="session-row">
+            <div class="session-bar" style="background:#7ec89a"></div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between">
+                <div class="session-name">Carlos Silva</div>
+                <div class="session-time">09:30</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:1px">
+                <div class="session-type">Cabelo + Barba · 45min</div>
+                <div class="session-status" style="color:#7ec89a">Pago</div>
+              </div>
+            </div>
+          </div>
+          <div class="session-row">
+            <div class="session-bar" style="background:#7ec89a"></div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between">
+                <div class="session-name">Rui Santos</div>
+                <div class="session-time">10:30</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:1px">
+                <div class="session-type">Cabelo · 30min</div>
+                <div class="session-status" style="color:#7ec89a">Pago</div>
+              </div>
+            </div>
+          </div>
+          <div class="session-row">
+            <div class="session-bar" style="background:#e8a86d"></div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between">
+                <div class="session-name">André Lima</div>
+                <div class="session-time">12:00</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:1px">
+                <div class="session-type">Barba · 20min</div>
+                <div class="session-status" style="color:#e8a86d">Pendente</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-tabbar">
+        <div class="tab-item active"><div class="tab-icon">☀️</div><div class="tab-label" style="color:#7ec89a">Hoje</div></div>
+        <div class="tab-item"><div class="tab-icon">📅</div><div class="tab-label">Agenda</div></div>
+        <div class="tab-item"><div class="tab-icon">＋</div><div class="tab-label">Nova</div></div>
+        <div class="tab-item"><div class="tab-icon">👤</div><div class="tab-label">Clientes</div></div>
+        <div class="tab-item"><div class="tab-icon">💬</div><div class="tab-label">Chat</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4 — NOVA MARCAÇÃO -->
+  <div class="slide" id="s4">
+    <div class="slide-label">Nova marcação</div>
+    <div class="form-shell">
+      <div class="form-header">
+        <span class="form-header-back">‹</span>
+        Nova consulta
+      </div>
+      <div class="form-body">
+        <div class="form-field">
+          <div class="form-label">Paciente</div>
+          <div class="form-value">Ana Sousa</div>
+        </div>
+        <div class="form-field">
+          <div class="form-label">Data</div>
+          <div class="form-value">Seg, 25 Mar 2026</div>
+        </div>
+        <div class="form-field">
+          <div class="form-label">Hora</div>
+          <div class="chips">
+            <div class="chip">09:00</div>
+            <div class="chip active">10:00</div>
+            <div class="chip">11:00</div>
+            <div class="chip">14:00</div>
+          </div>
+        </div>
+        <div class="form-field">
+          <div class="form-label">Tipo</div>
+          <div class="chips">
+            <div class="chip active">Individual</div>
+            <div class="chip">Casal</div>
+            <div class="chip">Avaliação</div>
+          </div>
+        </div>
+        <div class="form-field">
+          <div class="form-label">Pagamento</div>
+          <div class="chips">
+            <div class="chip active">Pago</div>
+            <div class="chip">Pendente</div>
+            <div class="chip">Na Plataforma</div>
+          </div>
+        </div>
+        <div class="form-field">
+          <div class="form-label">Valor (€)</div>
+          <div class="form-value">75</div>
+        </div>
+      </div>
+      <div class="form-btn">Guardar consulta</div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5 — CLIENTES -->
+  <div class="slide" id="s5">
+    <div class="slide-label">Fichas de pacientes</div>
+    <div class="client-shell">
+      <div class="client-header">Pacientes</div>
+      <div class="client-search">🔍 Pesquisar paciente...</div>
+      <div style="flex:1;overflow:hidden">
+        <div class="client-row">
+          <div class="client-avatar" style="background:#7ec89a">A</div>
+          <div style="flex:1">
+            <div class="client-name">Ana Sousa</div>
+            <div class="client-meta">8 consultas · última há 3 dias</div>
+          </div>
+          <div class="client-next">próxima 25 mar</div>
+        </div>
+        <div class="client-row">
+          <div class="client-avatar" style="background:#9b7ec8">J</div>
+          <div style="flex:1">
+            <div class="client-name">João Ferreira</div>
+            <div class="client-meta">5 consultas · última há 1 sem</div>
+          </div>
+          <div class="client-next">próxima 28 mar</div>
+        </div>
+        <div class="client-row">
+          <div class="client-avatar" style="background:#e8a86d">M</div>
+          <div style="flex:1">
+            <div class="client-name">Maria Costa</div>
+            <div class="client-meta">12 consultas · última hoje</div>
+          </div>
+          <div class="client-next">próxima 1 abr</div>
+        </div>
+        <div class="client-row">
+          <div class="client-avatar" style="background:#7a9fc8">P</div>
+          <div style="flex:1">
+            <div class="client-name">Pedro Alves</div>
+            <div class="client-meta">3 consultas · Pack 5/10</div>
+          </div>
+          <div class="client-next">próxima 2 abr</div>
+        </div>
+        <div class="client-row">
+          <div class="client-avatar" style="background:#6b9a7a">L</div>
+          <div style="flex:1">
+            <div class="client-name">Luísa Mendes</div>
+            <div class="client-meta">6 consultas · última há 2 sem</div>
+          </div>
+          <div class="client-next" style="color:#e8a86d">pendente</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6 — BOOKING PÚBLICO -->
+  <div class="slide" id="s6">
+    <div class="slide-label">Link de marcação online</div>
+    <div class="booking-shell">
+      <div class="booking-url-bar">booking.apora.app/<span>sofia</span></div>
+      <div class="booking-body">
+        <div>
+          <div class="booking-prof">Sofia Andrade</div>
+          <div class="booking-prof-sub">Psicóloga — Lisboa</div>
+        </div>
+        <div>
+          <div class="form-label" style="margin-bottom:8px">Tipo de consulta</div>
+          <div class="booking-types">
+            <div class="booking-type selected">Individual</div>
+            <div class="booking-type">Casal</div>
+            <div class="booking-type">Avaliação</div>
+          </div>
+        </div>
+        <div>
+          <div class="form-label" style="margin-bottom:8px">Semana de 24 a 30 mar</div>
+          <div class="week-grid">
+            <div class="week-day"><div class="week-day-label">Seg</div><div class="week-day-dot has-slots">24</div></div>
+            <div class="week-day"><div class="week-day-label">Ter</div><div class="week-day-dot selected">25</div></div>
+            <div class="week-day"><div class="week-day-label">Qua</div><div class="week-day-dot has-slots">26</div></div>
+            <div class="week-day"><div class="week-day-label">Qui</div><div class="week-day-dot has-slots">27</div></div>
+            <div class="week-day"><div class="week-day-label">Sex</div><div class="week-day-dot has-slots">28</div></div>
+            <div class="week-day"><div class="week-day-label">Sáb</div><div class="week-day-dot">29</div></div>
+            <div class="week-day"><div class="week-day-label">Dom</div><div class="week-day-dot">30</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="form-label" style="margin-bottom:8px">Hora disponível</div>
+          <div class="booking-slots">
+            <div class="booking-slot">09:00</div>
+            <div class="booking-slot selected">10:00</div>
+            <div class="booking-slot">14:00</div>
+            <div class="booking-slot">15:00</div>
+            <div class="booking-slot">16:00</div>
+          </div>
+        </div>
+        <div class="booking-btn">Confirmar marcação</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 7 — CTA -->
+  <div class="slide" id="s7">
+    <div id="progress-bar7"></div>
+    <div class="glow2"></div>
+    <div class="cta-content">
+      <div class="cta-icon">A</div>
+      <div class="cta-title">Experimenta<br><span>grátis.</span></div>
+      <div class="cta-desc">
+        Beta gratuito e sem compromisso.<br>
+        Sem cartão de crédito necessário.
+      </div>
+      <div class="cta-profs">
+        <span class="cta-prof">🧠</span>
+        <span class="cta-prof">✂️</span>
+        <span class="cta-prof">🎨</span>
+        <span class="cta-prof">🗂️</span>
+        <span class="cta-prof">🏋️</span>
+      </div>
+      <div class="cta-btn">Candidatar em apora.app</div>
+      <div class="cta-url">apora.app · iOS &amp; Android</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <button class="ctrl" onclick="prev()">‹ Anterior</button>
+  <span id="slide-num">1 / 7</span>
+  <button class="ctrl" onclick="advance()">Próximo ›</button>
+  <button class="ctrl" id="pause-btn" onclick="togglePause()">⏸ Pausa</button>
+</div>
+
+<script>
+const SLIDES = 7;
+const DURATION = 4200; // ms per slide
+let current = 0;
+let paused = false;
+let timer = null;
+let fillTimer = null;
+
+// Inject progress bars into every slide
+const allSlides = document.querySelectorAll('.slide');
+allSlides.forEach(slide => {
+  let pb = slide.querySelector('[id^="progress-bar"]');
+  if (!pb) {
+    pb = document.createElement('div');
+    pb.style.cssText = 'display:flex;gap:5px;margin-bottom:24px;flex-shrink:0';
+    slide.insertBefore(pb, slide.firstChild);
+  }
+  pb.innerHTML = '';
+  for (let i = 0; i < SLIDES; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'prog-seg';
+    const fill = document.createElement('div');
+    fill.className = 'prog-seg-fill';
+    if (i < current) fill.classList.add('done');
+    seg.appendChild(fill);
+    pb.appendChild(seg);
+  }
+});
+
+function updateProgress(slideIndex, pct) {
+  allSlides.forEach(slide => {
+    const fills = slide.querySelectorAll('.prog-seg-fill');
+    fills.forEach((f, i) => {
+      f.style.transition = 'none';
+      if (i < slideIndex) {
+        f.style.width = '100%';
+      } else if (i === slideIndex) {
+        f.style.width = pct + '%';
+        f.style.transition = `width ${(DURATION * (1 - pct/100))}ms linear`;
+        setTimeout(() => { f.style.width = '100%'; }, 20);
+      } else {
+        f.style.width = '0%';
+      }
+    });
+  });
+}
+
+function showSlide(idx) {
+  allSlides.forEach((s, i) => s.classList.toggle('active', i === idx));
+  document.getElementById('slide-num').textContent = `${idx + 1} / ${SLIDES}`;
+  current = idx;
+  updateProgress(idx, 0);
+}
+
+function advance() {
+  showSlide((current + 1) % SLIDES);
+  if (!paused) restartTimer();
+}
+
+function prev() {
+  showSlide((current - 1 + SLIDES) % SLIDES);
+  if (!paused) restartTimer();
+}
+
+function restartTimer() {
+  clearInterval(timer);
+  timer = setInterval(advance, DURATION);
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pause-btn').textContent = paused ? '▶ Continuar' : '⏸ Pausa';
+  if (paused) {
+    clearInterval(timer);
+  } else {
+    restartTimer();
+  }
+}
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); advance(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  if (e.key === 'p') togglePause();
+});
+
+// Touch/click support for iOS (onclick on div unreliable on iOS Safari)
+const stage = document.getElementById('stage');
+let touchStartX = 0;
+let touchStartY = 0;
+stage.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+stage.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+    // tap — advance
+    advance();
+  } else if (dx < -30) {
+    // swipe left — advance
+    advance();
+  } else if (dx > 30) {
+    // swipe right — go back
+    prev();
+  }
+}, { passive: true });
+
+// Resume timer when tab becomes visible again (iOS background throttle)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !paused) restartTimer();
+});
+
+// Start
+showSlide(0);
+restartTimer();
+</script>
+</body>
+</html>
