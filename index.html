@@ -129,6 +129,17 @@ function getInitialWeekOffset() {
 }
 let weekOffset = getInitialWeekOffset();
 
+const PROFESSION_INQUIRY_HINTS = {
+  barbeiro:       'Descreve o horário e dia preferível, incluindo tipo de corte, estilo e qualquer preferência especial.',
+  psicologa:      'Descreve o motivo do contacto ou como posso ajudar-te.',
+  tatuador:       'Descreve a tatuagem que pretendes — estilo, localização no corpo, tamanho e referências.',
+  administrativo: 'Descreve o assunto e objectivo da reunião.',
+};
+
+function getInquiryHint() {
+  return PROFESSION_INQUIRY_HINTS[bookingInfo?.profession] || 'Descreve o que pretendes…';
+}
+
 function storageKey(k) { return `apora_${k}_${handle}`; }
 
 function getToken() {
@@ -413,7 +424,7 @@ function renderInquiryOnly() {
       </div>
       <div class="field">
         <label>Mensagem</label>
-        <textarea id="req-notes" placeholder="Descreve o que pretendes…"></textarea>
+        <textarea id="req-notes" placeholder="${getInquiryHint()}"></textarea>
       </div>
       <div id="req-error"></div>
       <button class="btn" onclick="submitRequest()">Enviar pedido</button>
@@ -452,7 +463,7 @@ function renderRequestOnly() {
       </div>
       <div class="field">
         <label>Descrição do trabalho</label>
-        <textarea id="req-notes" placeholder="Descreve o que pretendes — tamanho, estilo, localização, referências…"></textarea>
+        <textarea id="req-notes" placeholder="${getInquiryHint()}"></textarea>
       </div>
       <div id="req-error"></div>
       <button class="btn" onclick="submitRequest()">Enviar pedido</button>
