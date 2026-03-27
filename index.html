@@ -121,7 +121,7 @@ let selectedType = null;
 let showInfoForm = false;
 let showChat = false;
 let chatData = null; // {conversation_id, client_name, prof_name, messages}
-let chatPollInterval = null;
+let chatChannel = null; // Supabase Realtime channel para mensagens
 
 function getInitialWeekOffset() {
   const d = new Date().getDay();
@@ -720,13 +720,13 @@ async function openChat() {
 
   chatData = data;
   renderChatView();
-  startChatPolling();
+  startChatRealtime(chatData.conversation_id);
 }
 
 function closeChat() {
   showChat = false;
   chatData = null;
-  stopChatPolling();
+  stopChatRealtime();
   render();
 }
 
@@ -821,31 +821,41 @@ async function sendChatMessage() {
   renderChatView();
 }
 
-async function pollChat() {
-  if (!chatData || !showChat) return;
-  const token = localStorage.getItem(storageKey('token'));
-  if (!token) return;
-
-  const { data } = await sb.rpc('get_or_create_conversation', {
-    p_token: token,
-    p_handle: handle,
-  });
-
-  if (data?.messages && data.messages.length !== (chatData.messages || []).length) {
-    chatData = data;
-    renderChatView();
-  }
+function startChatRealtime(convId) {
+  stopChatRealtime();
+  chatChannel = sb.channel('messages-' + convId)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages',
+      filter: 'conversation_id=eq.' + convId,
+    }, (payload) => {
+      if (!chatData || !showChat) return;
+      const msg = payload.new;
+      if (!msg) return;
+      // Evitar duplicado da mensagem optimista (enviada pelo próprio cliente)
+      // A mensagem optimista tem id numérico (Date.now()), as reais têm UUID
+      if (chatData.messages && chatData.messages.some(m => m.id === msg.id)) return;
+      // Substituir mensagem optimista do cliente pelo registo real (mesmo body + sender)
+      const optimisticIdx = chatData.messages
+        ? chatData.messages.findIndex(m =>
+            typeof m.id === 'number' && m.sender === msg.sender && m.body === msg.body)
+        : -1;
+      if (optimisticIdx >= 0) {
+        chatData.messages[optimisticIdx] = msg;
+      } else {
+        chatData.messages = chatData.messages || [];
+        chatData.messages.push(msg);
+      }
+      renderChatView();
+    })
+    .subscribe();
 }
 
-function startChatPolling() {
-  stopChatPolling();
-  chatPollInterval = setInterval(pollChat, 5000);
-}
-
-function stopChatPolling() {
-  if (chatPollInterval) {
-    clearInterval(chatPollInterval);
-    chatPollInterval = null;
+function stopChatRealtime() {
+  if (chatChannel) {
+    sb.removeChannel(chatChannel);
+    chatChannel = null;
   }
 }
 
