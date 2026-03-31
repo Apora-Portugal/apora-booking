@@ -122,6 +122,14 @@ let showInfoForm = false;
 let showChat = false;
 let chatData = null; // {conversation_id, client_name, prof_name, messages}
 let chatChannel = null; // Supabase Realtime channel para mensagens
+let submitting = false; // previne double-tap em todos os formulários de submissão
+
+function withTimeout(promise, ms = 15000) {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
 
 function getInitialWeekOffset() {
   const d = new Date().getDay();
@@ -132,6 +140,7 @@ let weekOffset = getInitialWeekOffset();
 const PROFESSION_INQUIRY_HINTS = {
   barbeiro:       'Descreve o horário e dia preferível, incluindo tipo de corte, estilo e qualquer preferência especial.',
   psicologa:      'Descreve o motivo do contacto ou como posso ajudar-te.',
+  esteticista:    'Descreve o serviço que pretendes, incluindo preferências ou cuidados especiais.',
   tatuador:       'Descreve a tatuagem que pretendes — estilo, localização no corpo, tamanho e referências.',
   administrativo: 'Descreve o assunto e objectivo da reunião.',
 };
@@ -549,6 +558,7 @@ function changeWeek(delta) {
 }
 
 async function submitBooking() {
+  if (submitting) return;
   const name = document.getElementById('inp-name')?.value.trim();
   const email = document.getElementById('inp-email')?.value.trim();
   const phone = document.getElementById('inp-phone')?.value.trim();
@@ -568,30 +578,42 @@ async function submitBooking() {
     return;
   }
 
+  submitting = true;
   btn.disabled = true;
   btn.textContent = 'A enviar...';
   errEl.innerHTML = '';
 
   const token = getToken();
 
-  const { data, error } = await sb.rpc('create_booking', {
-    p_handle: handle,
-    p_date: selectedSlot.date,
-    p_time: selectedSlot.time,
-    p_client_name: name,
-    p_client_phone: phone || null,
-    p_type: selectedType || null,
-    p_booking_notes: notes,
-    p_sinal_declared: sinalDeclared,
-    p_client_email: email,
-    p_client_token: token,
-  });
+  let data, error;
+  try {
+    ({ data, error } = await withTimeout(sb.rpc('create_booking', {
+      p_handle: handle,
+      p_date: selectedSlot.date,
+      p_time: selectedSlot.time,
+      p_client_name: name,
+      p_client_phone: phone || null,
+      p_type: selectedType || null,
+      p_booking_notes: notes,
+      p_sinal_declared: sinalDeclared,
+      p_client_email: email,
+      p_client_token: token,
+    })));
+  } catch {
+    errEl.innerHTML = '<div class="error-msg">O pedido está a demorar mais do que esperado. Verifica a tua ligação e tenta novamente.</div>';
+    errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    btn.disabled = false;
+    btn.textContent = 'Enviar pedido de marcação';
+    submitting = false;
+    return;
+  }
 
   if (error || data?.error) {
     errEl.innerHTML = `<div class="error-msg">${data?.error || 'Não foi possível realizar a marcação. Tenta novamente.'}</div>`;
     errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     btn.disabled = false;
     btn.textContent = 'Enviar pedido de marcação';
+    submitting = false;
     return;
   }
 
@@ -599,31 +621,47 @@ async function submitBooking() {
 }
 
 async function submitRequest() {
+  if (submitting) return;
   const name = document.getElementById('req-name')?.value.trim();
   const email = document.getElementById('req-email')?.value.trim();
   const phone = document.getElementById('req-phone')?.value.trim();
   const notes = document.getElementById('req-notes')?.value.trim();
   const errEl = document.getElementById('req-error');
+  const btn = errEl?.nextElementSibling;
 
   if (!name) { errEl.innerHTML = '<div class="error-msg">Insere o teu nome.</div>'; return; }
   if (!email) { errEl.innerHTML = '<div class="error-msg">O email é obrigatório para receberes resposta.</div>'; return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.innerHTML = '<div class="error-msg">Insere um email válido.</div>'; return; }
   if (!notes && selectedType) { errEl.innerHTML = '<div class="error-msg">Descreve o trabalho que pretendes.</div>'; return; }
 
+  submitting = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'A enviar...'; }
+  errEl.innerHTML = '';
+
   const token = getToken();
   const messageText = selectedType ? `[${selectedType}] ${notes}` : (notes || '(sem mensagem)');
 
-  const { data, error } = await sb.rpc('create_inquiry', {
-    p_handle: handle,
-    p_client_name: name,
-    p_client_phone: phone || null,
-    p_message: messageText,
-    p_client_email: email,
-    p_client_token: token,
-  });
+  let data, error;
+  try {
+    ({ data, error } = await withTimeout(sb.rpc('create_inquiry', {
+      p_handle: handle,
+      p_client_name: name,
+      p_client_phone: phone || null,
+      p_message: messageText,
+      p_client_email: email,
+      p_client_token: token,
+    })));
+  } catch {
+    errEl.innerHTML = '<div class="error-msg">O pedido está a demorar mais do que esperado. Verifica a tua ligação e tenta novamente.</div>';
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar pedido'; }
+    submitting = false;
+    return;
+  }
 
   if (error || data?.error) {
-    document.getElementById('req-error').innerHTML = `<div class="error-msg">Não foi possível enviar. Tenta novamente.</div>`;
+    errEl.innerHTML = `<div class="error-msg">Não foi possível enviar. Tenta novamente.</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar pedido'; }
+    submitting = false;
     return;
   }
 
@@ -635,30 +673,46 @@ async function submitRequest() {
 }
 
 async function submitInquiry() {
+  if (submitting) return;
   const name = document.getElementById('info-name')?.value.trim();
   const email = document.getElementById('info-email')?.value.trim();
   const phone = document.getElementById('info-phone')?.value.trim();
   const msg = document.getElementById('info-msg')?.value.trim();
   const errEl = document.getElementById('info-error');
+  const btn = errEl?.nextElementSibling;
 
   if (!name) { errEl.innerHTML = '<div class="error-msg">Insere o teu nome.</div>'; return; }
   if (!email) { errEl.innerHTML = '<div class="error-msg">O email é obrigatório para receberes resposta.</div>'; return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.innerHTML = '<div class="error-msg">Insere um email válido.</div>'; return; }
   if (!msg) { errEl.innerHTML = '<div class="error-msg">Escreve a tua mensagem.</div>'; return; }
 
+  submitting = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'A enviar...'; }
+  errEl.innerHTML = '';
+
   const token = getToken();
 
-  const { data, error } = await sb.rpc('create_inquiry', {
-    p_handle: handle,
-    p_client_name: name,
-    p_client_phone: phone || null,
-    p_message: msg,
-    p_client_email: email,
-    p_client_token: token,
-  });
+  let data, error;
+  try {
+    ({ data, error } = await withTimeout(sb.rpc('create_inquiry', {
+      p_handle: handle,
+      p_client_name: name,
+      p_client_phone: phone || null,
+      p_message: msg,
+      p_client_email: email,
+      p_client_token: token,
+    })));
+  } catch {
+    errEl.innerHTML = '<div class="error-msg">O pedido está a demorar mais do que esperado. Verifica a tua ligação e tenta novamente.</div>';
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar mensagem'; }
+    submitting = false;
+    return;
+  }
 
   if (error || data?.error) {
     errEl.innerHTML = `<div class="error-msg">Não foi possível enviar. Tenta novamente.</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar mensagem'; }
+    submitting = false;
     return;
   }
 
@@ -858,6 +912,16 @@ function stopChatRealtime() {
     chatChannel = null;
   }
 }
+
+// Se o email de resposta incluiu ?token=xxx na URL, guardar e abrir chat directamente
+(function handleTokenParam() {
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get('token');
+  if (urlToken && handle) {
+    localStorage.setItem(storageKey('token'), urlToken);
+    showChat = true;
+  }
+})();
 
 loadBookingInfo();
 </script>
