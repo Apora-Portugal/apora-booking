@@ -402,7 +402,7 @@ function renderBookingForm(sessionLabel) {
   const descField = isSinal ? `
     <div class="field">
       <label>Descrição do trabalho</label>
-      <textarea id="inp-notes" placeholder="Descreve o que pretendes — tamanho, estilo, localização no corpo, referências…"></textarea>
+      <textarea id="inp-notes" placeholder="${getInquiryHint()}"></textarea>
     </div>` : '';
 
   const sinalCheckbox = isSinal ? `
@@ -780,7 +780,7 @@ function renderSuccessInquiry(name, hasChat) {
     <div class="success">
       <div class="icon">✉️</div>
       <h2>Mensagem enviada!</h2>
-      <p>${name}, a tua mensagem foi recebida.<br><br>${bookingInfo?.name ?? 'O profissional'} irá responder em breve.</p>
+      <p>${name}, a tua mensagem foi recebida.<br><br>${profName()} irá responder em breve.</p>
       ${chatBtn}
     </div>`;
 }
@@ -808,6 +808,8 @@ async function openChat() {
     return;
   }
 
+  // Guardar conv_id para que o botão "As minhas mensagens" apareça em visitas futuras
+  localStorage.setItem(storageKey('conv_id'), data.conversation_id);
   chatData = data;
   renderChatView();
   startChatRealtime(chatData.conversation_id);
@@ -837,7 +839,7 @@ function renderChatView() {
       <div class="chat-header">
         <button class="chat-header-back" onclick="closeChat()">←</button>
         <div>
-          <div class="chat-header-title">${escapeHtml(chatData.prof_name ?? bookingInfo?.name ?? '')}</div>
+          <div class="chat-header-title">${escapeHtml(chatData.prof_name ?? profName())}</div>
           <div class="chat-header-sub">${escapeHtml(chatData.client_name)}</div>
         </div>
       </div>
