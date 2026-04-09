@@ -269,6 +269,7 @@ function timeToMin(t) {
 
 function render() {
   if (showChat) {
+    if (!chatData) { openChat(); return; }
     renderChatView();
     return;
   }
@@ -440,8 +441,12 @@ function renderBookingForm(sessionLabel) {
 }
 
 function renderInquiryOnly() {
+  const chatBtn = hasExistingConversation()
+    ? `<button class="btn-chat" onclick="openChat()">💬 As minhas mensagens</button>`
+    : '';
   document.getElementById('app').innerHTML = `
     <div class="prof-name">${profName()}</div>
+    ${chatBtn}
     <div class="request-form">
       <h3>Marcações por pedido</h3>
       <p class="desc">${profName()} não tem marcações directas disponíveis de momento. Envia um pedido e será contactado/a.</p>
@@ -471,8 +476,12 @@ function renderInquiryOnly() {
 }
 
 function renderRequestOnly() {
+  const chatBtn = hasExistingConversation()
+    ? `<button class="btn-chat" onclick="openChat()">💬 As minhas mensagens</button>`
+    : '';
   document.getElementById('app').innerHTML = `
     <div class="prof-name">${profName()}</div>
+    ${chatBtn}
     <div class="type-chips">
       ${getVisibleTypes().map(t => {
         const mode = getTypeMode(t);
