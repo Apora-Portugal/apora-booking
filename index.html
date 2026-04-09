@@ -186,13 +186,34 @@ function getWeekDates(offset) {
   });
 }
 
-function generateSlots(availability) {
+function profName() {
+  return bookingInfo.display_name || bookingInfo.name;
+}
+
+function getDayHours(av, dayOfWeek) {
+  const dh = av.day_hours || {};
+  return dh[dayOfWeek] || { start: av.start, end: av.end };
+}
+
+function generateSlots(av) {
+  const slotDur = av.slot_duration;
+  const days = av.days || [];
+  let minStart = Infinity, maxEnd = 0;
+  for (const d of days) {
+    const h = getDayHours(av, d);
+    const [sh, sm] = h.start.split(':').map(Number);
+    const [eh, em] = h.end.split(':').map(Number);
+    minStart = Math.min(minStart, sh * 60 + sm);
+    maxEnd = Math.max(maxEnd, eh * 60 + em);
+  }
+  if (minStart === Infinity) {
+    const [sh, sm] = av.start.split(':').map(Number);
+    const [eh, em] = av.end.split(':').map(Number);
+    minStart = sh * 60 + sm;
+    maxEnd = eh * 60 + em;
+  }
   const slots = [];
-  const [sh, sm] = availability.start.split(':').map(Number);
-  const [eh, em] = availability.end.split(':').map(Number);
-  const startMin = sh * 60 + sm;
-  const endMin = eh * 60 + em;
-  for (let m = startMin; m < endMin; m += availability.slot_duration) {
+  for (let m = minStart; m < maxEnd; m += slotDur) {
     const h = Math.floor(m / 60);
     const min = m % 60;
     slots.push(`${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`);
@@ -313,6 +334,12 @@ function renderCalendar() {
       const dateStr = toDateStr(date);
       const dayOfWeek = date.getDay();
       const isWorkDay = av.days.includes(dayOfWeek);
+      let isInDayRange = true;
+      if (isWorkDay) {
+        const dh = getDayHours(av, dayOfWeek);
+        const slotMin = timeToMin(time);
+        isInDayRange = slotMin >= timeToMin(dh.start) && slotMin < timeToMin(dh.end);
+      }
       const isOccupied = isOverlapping(dateStr, time);
       const isPast = dateStr < today || (dateStr === today && time <= new Date().toTimeString().slice(0,5));
       const isBlocked = isInBlockedPeriod(dateStr);
@@ -320,7 +347,7 @@ function renderCalendar() {
 
       if (isBlocked) {
         slotsHTML += `<div class="slot blocked"></div>`;
-      } else if (!isWorkDay || isPast) {
+      } else if (!isWorkDay || !isInDayRange || isPast) {
         slotsHTML += `<div class="slot off"></div>`;
       } else if (isOccupied) {
         slotsHTML += `<div class="slot occupied"></div>`;
@@ -351,7 +378,7 @@ function renderCalendar() {
     : '';
 
   document.getElementById('app').innerHTML = `
-    <div class="prof-name">${bookingInfo.name}</div>
+    <div class="prof-name">${profName()}</div>
     ${chatBtn}
     ${typeSection}
     <div class="week-nav">
@@ -382,7 +409,7 @@ function renderBookingForm(sessionLabel) {
       <input type="checkbox" id="inp-sinal" />
       <div class="sinal-box-text">
         <div class="sinal-box-title">Sinal pago</div>
-        <div class="sinal-box-desc">Confirmo que já transferi o sinal combinado com ${bookingInfo.name}. A marcação só será confirmada após verificação.</div>
+        <div class="sinal-box-desc">Confirmo que já transferi o sinal combinado com ${profName()}. A marcação só será confirmada após verificação.</div>
       </div>
     </label>` : '';
 
@@ -414,10 +441,10 @@ function renderBookingForm(sessionLabel) {
 
 function renderInquiryOnly() {
   document.getElementById('app').innerHTML = `
-    <div class="prof-name">${bookingInfo.name}</div>
+    <div class="prof-name">${profName()}</div>
     <div class="request-form">
       <h3>Marcações por pedido</h3>
-      <p class="desc">${bookingInfo.name} não tem marcações directas disponíveis de momento. Envia um pedido e será contactado/a.</p>
+      <p class="desc">${profName()} não tem marcações directas disponíveis de momento. Envia um pedido e será contactado/a.</p>
       <div class="field">
         <label>Nome</label>
         <input id="req-name" type="text" placeholder="O teu nome" />
@@ -445,7 +472,7 @@ function renderInquiryOnly() {
 
 function renderRequestOnly() {
   document.getElementById('app').innerHTML = `
-    <div class="prof-name">${bookingInfo.name}</div>
+    <div class="prof-name">${profName()}</div>
     <div class="type-chips">
       ${getVisibleTypes().map(t => {
         const mode = getTypeMode(t);
@@ -456,7 +483,7 @@ function renderRequestOnly() {
     </div>
     <div class="request-form">
       <h3>Pedido de marcação</h3>
-      <p class="desc">${bookingInfo.name} irá analisar o teu pedido e entrar em contacto para combinar data e hora.</p>
+      <p class="desc">${profName()} irá analisar o teu pedido e entrar em contacto para combinar data e hora.</p>
       <div class="field">
         <label>Nome</label>
         <input id="req-name" type="text" placeholder="O teu nome" />
@@ -488,7 +515,7 @@ function renderInfoSection() {
       <div class="divider"></div>
       <div class="info-form">
         <h3>Pedir informação</h3>
-        <p class="desc">Envia uma mensagem directa a ${bookingInfo?.name ?? 'este profissional'}.</p>
+        <p class="desc">Envia uma mensagem directa a ${bookingInfo ? profName() : 'este profissional'}.</p>
         <div class="field">
           <label>Nome</label>
           <input id="info-name" type="text" placeholder="O teu nome" />
