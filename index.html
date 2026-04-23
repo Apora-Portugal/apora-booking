@@ -615,6 +615,24 @@ async function submitClassBooking() {
   if (!email) { errEl.innerHTML = '<div class="error-msg">O email é obrigatório para receberes a confirmação.</div>'; return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.innerHTML = '<div class="error-msg">Insere um email válido.</div>'; return; }
 
+  // Re-verificar capacidade antes de submeter (evita inscrição após aula esgotar)
+  if (selectedClassSlot) {
+    const cacheKey = `${selectedClassSlot.scheduleId}_${selectedClassSlot.date}`;
+    try {
+      const { count } = await sb.from('sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('class_schedule_id', selectedClassSlot.scheduleId)
+        .eq('date', selectedClassSlot.date)
+        .neq('status', 'cancelada');
+      classSlotCounts[cacheKey] = count ?? 0;
+      if (count !== null && count >= selectedClassSlot.capacity) {
+        errEl.innerHTML = '<div class="error-msg">Esta aula esgotou entretanto. Escolhe outra data.</div>';
+        renderCalendar();
+        return;
+      }
+    } catch { /* continua — o servidor verifica também */ }
+  }
+
   submitting = true;
   btn.disabled = true;
   btn.textContent = 'A enviar...';
