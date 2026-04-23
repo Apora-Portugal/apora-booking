@@ -97,6 +97,20 @@
     .chat-input::placeholder { color: #9a968e; }
     .chat-send { background: #7ec89a; border: none; border-radius: 20px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+    /* Class slots */
+    .class-slots { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .class-slot { background: rgba(122,159,200,0.10); border: 1px solid rgba(122,159,200,0.25); border-radius: 12px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12; transition: background 0.15s; }
+    .class-slot:hover { background: rgba(122,159,200,0.20); }
+    .class-slot.selected { background: rgba(122,159,200,0.25); border-color: #7a9fc8; }
+    .class-slot.esgotado { background: rgba(26,32,30,0.5); border-color: #2a3530; cursor: not-allowed; opacity: 0.6; }
+    .class-slot-left { flex: 1; }
+    .class-slot-day { font-size: 13px; font-weight: 600; color: #7a9fc8; margin-bottom: 2px; }
+    .class-slot.esgotado .class-slot-day { color: #9a968e; }
+    .class-slot-time { font-size: 15px; font-weight: 700; color: #f4f2ee; margin-bottom: 2px; }
+    .class-slot-info { font-size: 12px; color: #9a968e; }
+    .class-slot-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+    .class-slot-badge.vagas { background: rgba(122,159,200,0.15); color: #7a9fc8; }
+    .class-slot-badge.esgotado { background: rgba(154,150,142,0.15); color: #9a968e; }
   </style>
 </head>
 <body>
@@ -116,13 +130,16 @@ const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho'
 
 let handle = window.location.pathname.replace(/^\//, '').split('/')[0] || '';
 let bookingInfo = null;
+let classSchedules = []; // horários de aula recorrentes (personal_trainer)
 let selectedSlot = null;
+let selectedClassSlot = null; // { scheduleId, date, time, duration, capacity }
 let selectedType = null;
 let showInfoForm = false;
 let showChat = false;
 let chatData = null; // {conversation_id, client_name, prof_name, messages}
 let chatChannel = null; // Supabase Realtime channel para mensagens
 let submitting = false; // previne double-tap em todos os formulários de submissão
+let classSlotCounts = {}; // cache: { scheduleId_date: count }
 
 function withTimeout(promise, ms = 15000) {
   const timeout = new Promise((_, reject) =>
@@ -251,7 +268,91 @@ async function loadBookingInfo() {
   });
   if (!data || error) { renderNotFound(); return; }
   bookingInfo = data;
+  // Carregar aulas de grupo se o perfil tiver profile_id
+  if (bookingInfo.profile_id) {
+    try {
+      const { data: schedData } = await sb
+        .from('class_schedules')
+        .select('*')
+        .eq('profile_id', bookingInfo.profile_id)
+        .eq('active', true)
+        .order('day_of_week')
+        .order('time');
+      classSchedules = schedData ?? [];
+    } catch { classSchedules = []; }
+  }
   render();
+}
+
+function typeHasClassSchedules(typeName) {
+  return classSchedules.some(s => s.type === typeName);
+}
+
+function getUpcomingClassSlots(typeName) {
+  const schedules = classSchedules.filter(s => s.type === typeName);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const slots = [];
+
+  for (const sch of schedules) {
+    for (let week = 0; week < 4; week++) {
+      const d = new Date(today);
+      const daysUntil = ((sch.day_of_week - d.getDay()) + 7) % 7 || 7;
+      d.setDate(d.getDate() + daysUntil + week * 7);
+      const dateStr = toDateStr(d);
+      // Não mostrar datas passadas (incluindo hoje se hora já passou)
+      const nowStr = `${String(new Date().getHours()).padStart(2,'0')}:${String(new Date().getMinutes()).padStart(2,'0')}`;
+      if (dateStr === toDateStr(new Date()) && sch.time <= nowStr) continue;
+      slots.push({ schedule: sch, date: dateStr });
+    }
+  }
+
+  // Ordenar por data e hora
+  slots.sort((a, b) => {
+    const da = a.date + 'T' + a.schedule.time;
+    const db = b.date + 'T' + b.schedule.time;
+    return da.localeCompare(db);
+  });
+
+  // Máximo 12 slots (3 semanas × 4 aulas, approx)
+  return slots.slice(0, 12);
+}
+
+async function loadClassSlotCounts(slots) {
+  for (const slot of slots) {
+    const cacheKey = `${slot.schedule.id}_${slot.date}`;
+    if (classSlotCounts[cacheKey] !== undefined) continue;
+    try {
+      const { count } = await sb
+        .from('sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('class_schedule_id', slot.schedule.id)
+        .eq('date', slot.date)
+        .neq('status', 'cancelada');
+      classSlotCounts[cacheKey] = count ?? 0;
+    } catch { classSlotCounts[cacheKey] = 0; }
+  }
+}
+
+function formatClassSlotDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const dayNames = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  return `${dayNames[date.getDay()]}, ${d} ${MONTHS_PT[m - 1]}`;
+}
+
+function selectClassSlotItem(scheduleId, date, time, duration, capacity) {
+  selectedClassSlot = { scheduleId, date, time, duration, capacity };
+  selectedSlot = null;
+  renderCalendar();
+  setTimeout(() => {
+    document.querySelector('.form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function clearClassSlot() {
+  selectedClassSlot = null;
+  renderCalendar();
 }
 
 function renderNotFound() {
@@ -286,12 +387,25 @@ function render() {
   renderCalendar();
 }
 
+async function renderClassSlotsAsync() {
+  const slots = getUpcomingClassSlots(selectedType);
+  await loadClassSlotCounts(slots);
+  renderCalendar();
+}
+
 function renderCalendar() {
   const visibleTypes = getVisibleTypes();
   if (visibleTypes.length === 0) {
     renderInquiryOnly();
     return;
   }
+
+  // Se o tipo seleccionado tem aulas de grupo, mostrar lista de aulas em vez da grelha
+  if (selectedType && typeHasClassSchedules(selectedType) && currentMode() === 'agendar') {
+    renderClassSlots();
+    return;
+  }
+
   const av = bookingInfo.availability;
   if (!av || !av.start || !av.end || !av.days || av.days.length === 0) {
     renderInquiryOnly();
@@ -392,6 +506,156 @@ function renderCalendar() {
     ${selectedSlot ? renderBookingForm(sessionLabel) : ''}
     ${renderInfoSection()}
   `;
+}
+
+function renderClassSlots() {
+  const visibleTypes = getVisibleTypes();
+  const sessionLabel = bookingInfo.terminology?.session || 'sessão';
+  const chatBtn = hasExistingConversation()
+    ? `<button class="btn-chat" onclick="openChat()">💬 As minhas mensagens</button>`
+    : '';
+
+  let typeSection = '';
+  if (visibleTypes.length > 1) {
+    const chipsHTML = visibleTypes.map(t => {
+      const mode = getTypeMode(t);
+      const badge = mode === 'com_sinal'
+        ? '<span class="mode-badge sinal">Sinal</span>'
+        : mode === 'so_pedido'
+        ? '<span class="mode-badge pedido">Pedido</span>'
+        : '';
+      return `<div class="type-chip${selectedType === t ? ' selected' : ''}" onclick="selectType('${t}')">${t}${badge}</div>`;
+    }).join('');
+    typeSection = `
+      <div class="section-title">Tipo de ${sessionLabel}</div>
+      <div class="type-chips">${chipsHTML}</div>`;
+  }
+
+  const slots = getUpcomingClassSlots(selectedType);
+
+  let slotsHTML = '';
+  if (slots.length === 0) {
+    slotsHTML = `<p style="color:#9a968e;font-size:13px;padding:12px 0;">Não há aulas disponíveis nas próximas semanas.</p>`;
+  } else {
+    slotsHTML = slots.map(slot => {
+      const cacheKey = `${slot.schedule.id}_${slot.date}`;
+      const count = classSlotCounts[cacheKey] ?? null;
+      const capacity = slot.schedule.capacity;
+      const esgotado = count !== null && count >= capacity;
+      const vagasText = count !== null ? `${count}/${capacity} vagas` : `${capacity} vagas`;
+      const isSelected = selectedClassSlot?.scheduleId === slot.schedule.id && selectedClassSlot?.date === slot.date;
+      const cls = esgotado ? 'class-slot esgotado' : (isSelected ? 'class-slot selected' : 'class-slot');
+      const onclick = esgotado ? '' : `onclick="selectClassSlotItem('${slot.schedule.id}','${slot.date}','${slot.schedule.time}',${slot.schedule.duration},${capacity})"`;
+      const badgeCls = esgotado ? 'class-slot-badge esgotado' : 'class-slot-badge vagas';
+      const badgeText = esgotado ? 'Esgotado' : vagasText;
+      return `
+        <div class="${cls}" ${onclick}>
+          <div class="class-slot-left">
+            <div class="class-slot-day">${formatClassSlotDate(slot.date)}</div>
+            <div class="class-slot-time">${slot.schedule.time}</div>
+            <div class="class-slot-info">${slot.schedule.duration} min</div>
+          </div>
+          <span class="${badgeCls}">${badgeText}</span>
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('app').innerHTML = `
+    <div class="prof-name">${profName()}</div>
+    ${chatBtn}
+    ${typeSection}
+    <div class="section-title">Próximas aulas disponíveis</div>
+    <div class="class-slots">${slotsHTML}</div>
+    ${selectedClassSlot ? renderClassBookingForm(sessionLabel) : ''}
+    ${renderInfoSection()}
+  `;
+
+  // Carregar contagens em background e re-renderizar
+  if (slots.some(s => classSlotCounts[`${s.schedule.id}_${s.date}`] === undefined)) {
+    renderClassSlotsAsync();
+  }
+}
+
+function renderClassBookingForm(sessionLabel) {
+  const [y, m, d] = selectedClassSlot.date.split('-');
+  return `
+    <div class="form">
+      <h3>Inscrição na aula</h3>
+      <div class="selected-slot">${d}/${m}/${y} às ${selectedClassSlot.time} · ${selectedClassSlot.duration} min</div>
+      <div class="field">
+        <label>Nome</label>
+        <input id="inp-name" type="text" placeholder="O teu nome" />
+      </div>
+      <div class="field">
+        <label>Email <span style="color:#e88a6d">*</span></label>
+        <input id="inp-email" type="email" placeholder="o.teu@email.com" />
+        <div class="field-hint">📩 Receberás a confirmação da inscrição por email.</div>
+      </div>
+      <div class="field">
+        <label>Telefone</label>
+        <input id="inp-phone" type="tel" placeholder="+351 912 345 678" />
+      </div>
+      <div id="form-error"></div>
+      <button class="btn" id="submit-btn" onclick="submitClassBooking()">Confirmar inscrição</button>
+      <button class="btn-secondary" onclick="clearClassSlot()">Cancelar</button>
+      <p class="privacy-note">Os teus dados são utilizados exclusivamente para processar esta inscrição, de acordo com a <a href="https://apora.app/privacidade" target="_blank">Política de Privacidade</a> da Apora.</p>
+    </div>`;
+}
+
+async function submitClassBooking() {
+  if (submitting) return;
+  const name = document.getElementById('inp-name')?.value.trim();
+  const email = document.getElementById('inp-email')?.value.trim();
+  const phone = document.getElementById('inp-phone')?.value.trim();
+  const btn = document.getElementById('submit-btn');
+  const errEl = document.getElementById('form-error');
+
+  if (!selectedType) { errEl.innerHTML = '<div class="error-msg">Selecciona o tipo de aula antes de continuar.</div>'; return; }
+  if (!name) { errEl.innerHTML = '<div class="error-msg">Insere o teu nome.</div>'; return; }
+  if (!email) { errEl.innerHTML = '<div class="error-msg">O email é obrigatório para receberes a confirmação.</div>'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.innerHTML = '<div class="error-msg">Insere um email válido.</div>'; return; }
+
+  submitting = true;
+  btn.disabled = true;
+  btn.textContent = 'A enviar...';
+  errEl.innerHTML = '';
+
+  const token = getToken();
+
+  let data, error;
+  try {
+    ({ data, error } = await withTimeout(sb.rpc('create_booking', {
+      p_handle: handle,
+      p_date: selectedClassSlot.date,
+      p_time: selectedClassSlot.time,
+      p_client_name: name,
+      p_client_phone: phone || null,
+      p_type: selectedType || null,
+      p_booking_notes: null,
+      p_sinal_declared: false,
+      p_client_email: email,
+      p_client_token: token,
+      p_class_schedule_id: selectedClassSlot.scheduleId,
+    })));
+  } catch {
+    errEl.innerHTML = '<div class="error-msg">O pedido está a demorar mais do que esperado. Verifica a tua ligação e tenta novamente.</div>';
+    errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    btn.disabled = false;
+    btn.textContent = 'Confirmar inscrição';
+    submitting = false;
+    return;
+  }
+
+  if (error || data?.error) {
+    errEl.innerHTML = `<div class="error-msg">${data?.error || 'Não foi possível realizar a inscrição. Tenta novamente.'}</div>`;
+    errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    btn.disabled = false;
+    btn.textContent = 'Confirmar inscrição';
+    submitting = false;
+    return;
+  }
+
+  renderSuccessBooking(name, false);
 }
 
 function renderBookingForm(sessionLabel) {
@@ -561,6 +825,7 @@ function toggleInfoForm() {
 function selectType(t) {
   selectedType = t;
   selectedSlot = null;
+  selectedClassSlot = null;
   render();
   setTimeout(() => {
     const el = document.querySelector('.request-form, .week-nav');
@@ -571,6 +836,7 @@ function selectType(t) {
 function clearType() {
   selectedType = null;
   selectedSlot = null;
+  selectedClassSlot = null;
   render();
 }
 
