@@ -140,6 +140,24 @@ let chatData = null; // {conversation_id, client_name, prof_name, messages}
 let chatChannel = null; // Supabase Realtime channel para mensagens
 let submitting = false; // previne double-tap em todos os formulários de submissão
 let classSlotCounts = {}; // cache: { scheduleId_date: count }
+let formState = { name: '', email: '', phone: '', notes: '', sinal: false };
+
+function saveFormState() {
+  const name  = document.getElementById('inp-name')  || document.getElementById('req-name');
+  const email = document.getElementById('inp-email') || document.getElementById('req-email');
+  const phone = document.getElementById('inp-phone') || document.getElementById('req-phone');
+  const notes = document.getElementById('inp-notes') || document.getElementById('req-notes');
+  const sinal = document.getElementById('inp-sinal');
+  if (name)  formState.name  = name.value;
+  if (email) formState.email = email.value;
+  if (phone) formState.phone = phone.value;
+  if (notes) formState.notes = notes.value;
+  if (sinal) formState.sinal = sinal.checked;
+}
+
+function escAttr(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
 
 function withTimeout(promise, ms = 15000) {
   const timeout = new Promise((_, reject) =>
@@ -584,16 +602,16 @@ function renderClassBookingForm(sessionLabel) {
       <div class="selected-slot">${d}/${m}/${y} às ${selectedClassSlot.time} · ${selectedClassSlot.duration} min</div>
       <div class="field">
         <label>Nome</label>
-        <input id="inp-name" type="text" placeholder="O teu nome" />
+        <input id="inp-name" type="text" placeholder="O teu nome" value="${escAttr(formState.name)}" />
       </div>
       <div class="field">
         <label>Email <span style="color:#e88a6d">*</span></label>
-        <input id="inp-email" type="email" placeholder="o.teu@email.com" />
+        <input id="inp-email" type="email" placeholder="o.teu@email.com" value="${escAttr(formState.email)}" />
         <div class="field-hint">📩 Receberás a confirmação da inscrição por email.</div>
       </div>
       <div class="field">
         <label>Telefone</label>
-        <input id="inp-phone" type="tel" placeholder="+351 912 345 678" />
+        <input id="inp-phone" type="tel" placeholder="+351 912 345 678" value="${escAttr(formState.phone)}" />
       </div>
       <div id="form-error"></div>
       <button class="btn" id="submit-btn" onclick="submitClassBooking()">Confirmar inscrição</button>
@@ -684,12 +702,12 @@ function renderBookingForm(sessionLabel) {
   const descField = isSinal ? `
     <div class="field">
       <label>Descrição do trabalho</label>
-      <textarea id="inp-notes" placeholder="${getInquiryHint()}"></textarea>
+      <textarea id="inp-notes" placeholder="${getInquiryHint()}">${escAttr(formState.notes)}</textarea>
     </div>` : '';
 
   const sinalCheckbox = isSinal ? `
     <label class="sinal-box" for="inp-sinal">
-      <input type="checkbox" id="inp-sinal" />
+      <input type="checkbox" id="inp-sinal" ${formState.sinal ? 'checked' : ''} />
       <div class="sinal-box-text">
         <div class="sinal-box-title">Sinal pago</div>
         <div class="sinal-box-desc">Confirmo que já transferi o sinal combinado com ${profName()}. A marcação só será confirmada após verificação.</div>
@@ -702,16 +720,16 @@ function renderBookingForm(sessionLabel) {
       <div class="selected-slot">${d}/${m}/${y} às ${selectedSlot.time}</div>
       <div class="field">
         <label>Nome</label>
-        <input id="inp-name" type="text" placeholder="O teu nome" />
+        <input id="inp-name" type="text" placeholder="O teu nome" value="${escAttr(formState.name)}" />
       </div>
       <div class="field">
         <label>Email <span style="color:#e88a6d">*</span></label>
-        <input id="inp-email" type="email" placeholder="o.teu@email.com" />
+        <input id="inp-email" type="email" placeholder="o.teu@email.com" value="${escAttr(formState.email)}" />
         <div class="field-hint">📩 Receberás a confirmação (ou rejeição) da marcação por email.</div>
       </div>
       <div class="field">
         <label>Telefone</label>
-        <input id="inp-phone" type="tel" placeholder="+351 912 345 678" />
+        <input id="inp-phone" type="tel" placeholder="+351 912 345 678" value="${escAttr(formState.phone)}" />
       </div>
       ${descField}
       ${sinalCheckbox}
@@ -734,20 +752,20 @@ function renderInquiryOnly() {
       <p class="desc">${profName()} não tem marcações directas disponíveis de momento. Envia um pedido e será contactado/a.</p>
       <div class="field">
         <label>Nome</label>
-        <input id="req-name" type="text" placeholder="O teu nome" />
+        <input id="req-name" type="text" placeholder="O teu nome" value="${escAttr(formState.name)}" />
       </div>
       <div class="field">
         <label>Email *</label>
-        <input id="req-email" type="email" placeholder="o.teu@email.com" />
+        <input id="req-email" type="email" placeholder="o.teu@email.com" value="${escAttr(formState.email)}" />
         <div class="field-hint">Necessário para receberes resposta e poderes enviar mensagens.</div>
       </div>
       <div class="field">
         <label>Telefone</label>
-        <input id="req-phone" type="tel" placeholder="+351 912 345 678" />
+        <input id="req-phone" type="tel" placeholder="+351 912 345 678" value="${escAttr(formState.phone)}" />
       </div>
       <div class="field">
         <label>Mensagem</label>
-        <textarea id="req-notes" placeholder="${getInquiryHint()}"></textarea>
+        <textarea id="req-notes" placeholder="${getInquiryHint()}">${escAttr(formState.notes)}</textarea>
       </div>
       <div id="req-error"></div>
       <button class="btn" onclick="submitRequest()">Enviar pedido</button>
@@ -777,20 +795,20 @@ function renderRequestOnly() {
       <p class="desc">${profName()} irá analisar o teu pedido e entrar em contacto para combinar data e hora.</p>
       <div class="field">
         <label>Nome</label>
-        <input id="req-name" type="text" placeholder="O teu nome" />
+        <input id="req-name" type="text" placeholder="O teu nome" value="${escAttr(formState.name)}" />
       </div>
       <div class="field">
         <label>Email *</label>
-        <input id="req-email" type="email" placeholder="o.teu@email.com" />
+        <input id="req-email" type="email" placeholder="o.teu@email.com" value="${escAttr(formState.email)}" />
         <div class="field-hint">Necessário para receberes resposta e poderes enviar mensagens.</div>
       </div>
       <div class="field">
         <label>Telefone</label>
-        <input id="req-phone" type="tel" placeholder="+351 912 345 678" />
+        <input id="req-phone" type="tel" placeholder="+351 912 345 678" value="${escAttr(formState.phone)}" />
       </div>
       <div class="field">
         <label>Descrição do trabalho</label>
-        <textarea id="req-notes" placeholder="${getInquiryHint()}"></textarea>
+        <textarea id="req-notes" placeholder="${getInquiryHint()}">${escAttr(formState.notes)}</textarea>
       </div>
       <div id="req-error"></div>
       <button class="btn" onclick="submitRequest()">Enviar pedido</button>
@@ -841,8 +859,12 @@ function toggleInfoForm() {
 }
 
 function selectType(t) {
+  saveFormState();
+  const newMode = getTypeMode(t);
+  // Preservar slot se o novo tipo também usa grelha normal (não apagar o que o utilizador já escolheu)
+  const keepSlot = ['agendar', 'com_sinal'].includes(newMode) && !typeHasClassSchedules(t);
   selectedType = t;
-  selectedSlot = null;
+  if (!keepSlot) selectedSlot = null;
   selectedClassSlot = null;
   render();
   setTimeout(() => {
