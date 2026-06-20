@@ -285,6 +285,7 @@ async function loadBookingInfo() {
     p_week_start: toDateStr(monday),
   });
   if (!data || error) { renderNotFound(); return; }
+  if (data.plan_blocked) { renderPlanBlocked(); return; }
   bookingInfo = data;
   // Carregar aulas de grupo se o perfil tiver profile_id
   if (bookingInfo.profile_id) {
@@ -378,6 +379,14 @@ function renderNotFound() {
     <div class="not-found">
       <div style="font-size:48px;margin-bottom:16px">🔍</div>
       <p>Profissional não encontrado.</p>
+    </div>`;
+}
+
+function renderPlanBlocked() {
+  document.getElementById('app').innerHTML = `
+    <div class="not-found">
+      <div style="font-size:48px;margin-bottom:16px">📅</div>
+      <p>Este profissional não tem marcações online disponíveis de momento.</p>
     </div>`;
 }
 
