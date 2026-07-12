@@ -225,35 +225,47 @@ function profName() {
   return bookingInfo.display_name || bookingInfo.name;
 }
 
+// Devolve sempre um array de blocos {start,end} para o dia. Aceita o formato
+// antigo (objecto único) para compatibilidade com perfis já gravados.
 function getDayHours(av, dayOfWeek) {
   const dh = av.day_hours || {};
-  return dh[dayOfWeek] || { start: av.start, end: av.end };
+  const raw = dh[dayOfWeek];
+  if (Array.isArray(raw) && raw.length > 0) return raw;
+  if (raw && raw.start) return [raw];
+  return [{ start: av.start, end: av.end }];
 }
 
-function generateSlots(av) {
-  const slotDur = av.slot_duration;
-  const days = av.days || [];
-  let minStart = Infinity, maxEnd = 0;
-  for (const d of days) {
-    const h = getDayHours(av, d);
-    const [sh, sm] = h.start.split(':').map(Number);
-    const [eh, em] = h.end.split(':').map(Number);
-    minStart = Math.min(minStart, sh * 60 + sm);
-    maxEnd = Math.max(maxEnd, eh * 60 + em);
-  }
-  if (minStart === Infinity) {
-    const [sh, sm] = av.start.split(':').map(Number);
-    const [eh, em] = av.end.split(':').map(Number);
-    minStart = sh * 60 + sm;
-    maxEnd = eh * 60 + em;
-  }
+// Horários candidatos para UM dia, ancorados ao início de cada bloco desse dia
+// (não a uma grelha global da semana) e só incluindo horas em que a marcação
+// completa (duração real, não só o passo da grelha) cabe dentro do bloco.
+function generateDaySlots(av, dayOfWeek) {
+  const stepMin = av.booking_interval || av.slot_duration;
+  const durMin = av.slot_duration;
+  if (!stepMin || stepMin <= 0 || !durMin || durMin <= 0) return [];
   const slots = [];
-  for (let m = minStart; m < maxEnd; m += slotDur) {
-    const h = Math.floor(m / 60);
-    const min = m % 60;
-    slots.push(`${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`);
+  for (const block of getDayHours(av, dayOfWeek)) {
+    const [sh, sm] = block.start.split(':').map(Number);
+    const [eh, em] = block.end.split(':').map(Number);
+    const blockStart = sh * 60 + sm;
+    const blockEnd = eh * 60 + em;
+    for (let m = blockStart; m + durMin <= blockEnd; m += stepMin) {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      slots.push(`${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`);
+    }
   }
   return slots;
+}
+
+// União dos horários de todos os dias activos — usada só para as linhas da
+// grelha semanal; a disponibilidade real de cada célula vem de generateDaySlots.
+function generateSlots(av) {
+  const days = av.days || [];
+  const allTimes = new Set();
+  for (const d of days) {
+    for (const t of generateDaySlots(av, d)) allTimes.add(t);
+  }
+  return Array.from(allTimes).sort();
 }
 
 function getTypeMode(typeName) {
@@ -470,18 +482,22 @@ function renderCalendar() {
     return `<div class="day-header${isBlocked ? ' unavailable' : ''}">${DAYS_PT[i]}</div>`;
   }).join('');
 
+  // Pré-calcula, uma vez por dia da semana (0-6), o conjunto de horários que
+  // essa dia realmente oferece (já ancorados aos seus próprios blocos e já
+  // filtrados para a marcação completa caber no bloco) — evita recalcular
+  // getDayHours/timeToMin em cada célula da grelha (7 dias × N slots).
+  const daySlotSets = {};
+  for (const d of av.days) {
+    daySlotSets[d] = new Set(generateDaySlots(av, d));
+  }
+
   let slotsHTML = '';
   for (const time of slots) {
     for (const date of weekDates) {
       const dateStr = toDateStr(date);
       const dayOfWeek = date.getDay();
       const isWorkDay = av.days.includes(dayOfWeek);
-      let isInDayRange = true;
-      if (isWorkDay) {
-        const dh = getDayHours(av, dayOfWeek);
-        const slotMin = timeToMin(time);
-        isInDayRange = slotMin >= timeToMin(dh.start) && slotMin < timeToMin(dh.end);
-      }
+      const isInDayRange = isWorkDay && daySlotSets[dayOfWeek].has(time);
       const isOccupied = isOverlapping(dateStr, time);
       const isPast = dateStr < today || (dateStr === today && time <= new Date().toTimeString().slice(0,5));
       const isBlocked = isInBlockedPeriod(dateStr);
